@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 from typing import Any
+import logging
 
 from tqdm import tqdm
 
@@ -25,7 +26,7 @@ from webgrade.catalog import load_catalog, load_single_site
 from webgrade.config import Settings
 from webgrade.db import Database
 from webgrade.exporters import export_catalog_excel, export_catalog_json
-from webgrade.logging_utils import close_logging, configure_logging
+from webgrade.logging_utils import close_logging, configure_logging, log_event
 from webgrade.reporting import build_findings, export_pdf_report, render_html_report
 from webgrade.scoring import compute_scores
 from webgrade.types import CatalogSite, RunOptions
@@ -157,11 +158,16 @@ def _run_technical_adapters(settings: Settings, site: CatalogSite, logger: Any) 
             non_ok = [result["adapter_key"] for result in results if result["status"] != "ok"]
             if non_ok:
                 manual_review_reasons.append(f"{adapter_name}_failed")
-                logger.warning("Adapter %s completed with non-ok results for %s: %s", adapter_name, site.url, ", ".join(non_ok))
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    f"Adapter {adapter_name} completed with non-ok results for {site.url}: {', '.join(non_ok)}",
+                    stage=adapter_name,
+                )
             else:
-                logger.info("Completed adapter %s for %s", adapter_name, site.url)
+                log_event(logger, logging.INFO, f"Completed adapter {adapter_name} for {site.url}", stage=adapter_name)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Adapter %s failed for %s: %s", adapter_name, site.url, exc)
+            log_event(logger, logging.WARNING, f"Adapter {adapter_name} failed for {site.url}: {exc}", stage=adapter_name)
             manual_review_reasons.append(f"{adapter_name}_failed")
             for adapter_key in expected_keys:
                 viewport = "desktop" if adapter_key.endswith("desktop") else "mobile" if adapter_key.endswith("mobile") else "combined"
@@ -270,6 +276,9 @@ def _capture_site_screenshots(
             raw=screenshot_result["raw"],
             error=screenshot_result["error"],
         )
+        if screenshot_result["status"] != "ok":
+            manual_review_reasons.append("screenshots_partial")
+            log_event(logger, logging.WARNING, f"Screenshot capture partially succeeded for {site.url}", stage="screenshots")
         for capture in captures:
             relative_path = capture["file_path"].relative_to(batch_dir).as_posix()
             db.add_screenshot(
@@ -287,9 +296,9 @@ def _capture_site_screenshots(
                     "metadata": capture["metadata"],
                 }
             )
-        logger.info("Captured screenshots for %s", site.url)
+        log_event(logger, logging.INFO, f"Captured screenshots for {site.url}", stage="screenshots")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Screenshot capture failed for %s: %s", site.url, exc)
+        log_event(logger, logging.WARNING, f"Screenshot capture failed for {site.url}: {exc}", stage="screenshots")
         manual_review_reasons.append("screenshots_failed")
         failed_result = {
             "adapter_key": "screenshots",
@@ -346,7 +355,7 @@ def _run_vision_stage(
             delay_seconds=settings.vision_delay_seconds,
         )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Vision scoring failed for %s: %s", site.url, exc)
+        log_event(logger, logging.WARNING, f"Vision scoring failed for {site.url}: {exc}", stage="vision")
         results = [
             {
                 "adapter_key": f"vision_{shot['viewport']}",
@@ -360,9 +369,9 @@ def _run_vision_stage(
         ]
     _persist_adapter_results(db, run_id, results)
     if any(result["status"] != "ok" for result in results):
-        logger.warning("Vision scoring completed with failed outputs for %s", site.url)
+        log_event(logger, logging.WARNING, f"Vision scoring completed with failed outputs for {site.url}", stage="vision")
         return {result["adapter_key"]: result for result in results}, ["vision_failed"]
-    logger.info("Completed vision scoring for %s", site.url)
+    log_event(logger, logging.INFO, f"Completed vision scoring for {site.url}", stage="vision")
     return {result["adapter_key"]: result for result in results}, []
 
 
@@ -386,6 +395,7 @@ def _render_site_reports(
     findings: list[dict[str, Any]],
     screenshots: list[dict[str, Any]],
     manual_review_reasons: list[str],
+    adapter_results: dict[str, dict[str, Any]],
     logger: Any,
 ) -> list[str]:
     extra_manual_review_reasons: list[str] = []
@@ -409,6 +419,26 @@ def _render_site_reports(
         }
         for shot in screenshots
     ]
+    technical_appendix = {
+        "scores": score_payload,
+        "manual_review": {"reasons": manual_review_reasons},
+        "screenshots": [
+            {
+                "viewport": shot["viewport"],
+                "relative_path": shot["relative_path"],
+                "annotation_count": len(shot.get("annotations", [])),
+            }
+            for shot in screenshots
+        ],
+    }
+    technical_appendix["adapters"] = {
+        key: {
+            "status": value.get("status"),
+            "summary": value.get("summary", {}),
+            "error": value.get("error"),
+        }
+        for key, value in adapter_results.items()
+    }
 
     try:
         html_output = render_html_report(
@@ -422,12 +452,13 @@ def _render_site_reports(
             score_payload=score_payload,
             findings=findings,
             screenshots=html_render_screenshots,
+            technical_appendix=technical_appendix,
             output_path=html_path,
         )
         relative_html = html_output.relative_to(batch_dir).as_posix()
         db.add_artifact(batch_id=batch_id, run_id=run_id, artifact_type="html_report", relative_path=relative_html)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("HTML report render failed for %s: %s", site.url, exc)
+        log_event(logger, logging.WARNING, f"HTML report render failed for {site.url}: {exc}", stage="html_report")
         extra_manual_review_reasons.append("html_report_failed")
         return extra_manual_review_reasons
 
@@ -436,7 +467,7 @@ def _render_site_reports(
         relative_pdf = pdf_output.relative_to(batch_dir).as_posix()
         db.add_artifact(batch_id=batch_id, run_id=run_id, artifact_type="pdf_report", relative_path=relative_pdf)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("PDF export failed for %s: %s", site.url, exc)
+        log_event(logger, logging.WARNING, f"PDF export failed for {site.url}: {exc}", stage="pdf_report")
         extra_manual_review_reasons.append("pdf_export_failed")
 
     return extra_manual_review_reasons
@@ -524,6 +555,7 @@ def _finalize_site_run(
         findings=findings,
         screenshots=screenshots,
         manual_review_reasons=manual_review_reasons,
+        adapter_results=adapter_results,
         logger=logger,
     )
     manual_review_reasons.extend(report_review_reasons)
@@ -566,12 +598,13 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
             site_count_total=len(sites),
         )
 
-        logger.info("Created batch %s with %s site(s)", batch_id, len(sites))
+        log_event(logger, logging.INFO, f"Created batch {batch_id} with {len(sites)} site(s)", batch_id=batch_id, stage="batch")
 
         try:
             counts = {"complete": 0, "partial": 0, "failed": 0}
             for site in tqdm(sites, desc="Processing sites", unit="site"):
-                logger.info("Preparing site %s", site.url)
+                slug = site_slug(site.url)
+                log_event(logger, logging.INFO, f"Preparing site {site.url}", batch_id=batch_id, site_slug=slug, stage="site_prepare")
                 site_id = db.upsert_site(site)
                 source_run = db.find_latest_run_with_screenshots(site_id) if options.only_vision else None
                 if options.only_vision and source_run is None:
@@ -595,7 +628,15 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
                 )
                 db.finalize_run(run_id, status=status, score_coverage=score_coverage, manual_review_reasons=manual_review_reasons)
                 counts[status] += 1
-                logger.info("Run %s for %s finished with status %s", run_id, site.url, status)
+                log_event(
+                    logger,
+                    logging.INFO,
+                    f"Run {run_id} for {site.url} finished with status {status}",
+                    batch_id=batch_id,
+                    run_id=run_id,
+                    site_slug=slug,
+                    stage="site_complete",
+                )
 
             status = _batch_status_from_counts(counts)
             db.finalize_batch(batch_id, status=status, counts=counts)
@@ -604,7 +645,7 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
             db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="excel_catalog", relative_path=excel_path.name)
             db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="json_bundle", relative_path="catalog.json")
             export_catalog_json(db, batch_id, batch_dir)
-            logger.info("Finished batch %s with status %s", batch_id, status)
+            log_event(logger, logging.INFO, f"Finished batch {batch_id} with status {status}", batch_id=batch_id, stage="batch_complete")
         finally:
             close_logging(logger)
 

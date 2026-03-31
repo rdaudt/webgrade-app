@@ -12,6 +12,37 @@ def _manual_review_note(manual_review_reasons: list[str]) -> str:
     return f"<p><strong>Manual review notes:</strong> {escaped}</p>"
 
 
+def _summary_paragraphs(score_payload: dict[str, Any], findings: list[dict[str, Any]], run: dict[str, Any]) -> str:
+    opening = {
+        "Tier 1": "This site shows a strong modernization opportunity.",
+        "Tier 2": "This site shows a meaningful improvement opportunity.",
+        "Tier 3": "This site appears comparatively current, with more targeted gaps.",
+        None: "This site has only partial evidence so far.",
+    }[score_payload.get("priority_tier")]
+
+    findings_sentence = ""
+    if findings:
+        finding_titles = [finding["finding_key"].replace("_", " ") for finding in findings[:2]]
+        if len(finding_titles) == 1:
+            findings_sentence = f"The strongest visible issue is {finding_titles[0]}."
+        else:
+            findings_sentence = f"The strongest visible issues are {finding_titles[0]} and {finding_titles[1]}."
+
+    coverage = float(run.get("score_coverage") or 0.0)
+    if coverage >= 0.99:
+        coverage_sentence = "The score is based on a near-complete evidence set."
+    elif coverage > 0:
+        coverage_sentence = f"The score uses partial evidence coverage of {coverage:.3f}, so some dimensions were renormalized."
+    else:
+        coverage_sentence = "The score uses minimal evidence and should be treated as provisional."
+
+    parts = [opening]
+    if findings_sentence:
+        parts.append(findings_sentence)
+    parts.append(coverage_sentence)
+    return "".join(f"<p>{escape(part)}</p>" for part in parts)
+
+
 def _render_annotations(annotations: list[dict[str, Any]]) -> str:
     if not annotations:
         return ""
@@ -41,6 +72,20 @@ def _render_annotations(annotations: list[dict[str, Any]]) -> str:
     return "".join(overlay_items) + f'<ol class="annotation-captions">{"".join(caption_items)}</ol>'
 
 
+def _render_appendix(technical_appendix: dict[str, Any]) -> str:
+    sections: list[str] = []
+    for title, payload in technical_appendix.items():
+        sections.append(
+            f"""
+            <section class="appendix-block">
+              <h3>{escape(title.replace('_', ' ').title())}</h3>
+              <pre>{escape(str(payload))}</pre>
+            </section>
+            """
+        )
+    return "".join(sections) or "<p>No technical appendix content is available for this run.</p>"
+
+
 def render_html_report(
     *,
     site: dict[str, Any],
@@ -48,16 +93,10 @@ def render_html_report(
     score_payload: dict[str, Any],
     findings: list[dict[str, Any]],
     screenshots: list[dict[str, Any]],
+    technical_appendix: dict[str, Any],
     output_path: Path,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    summary_sentence = {
-        "Tier 1": "This site shows a strong modernization opportunity.",
-        "Tier 2": "This site shows a meaningful improvement opportunity.",
-        "Tier 3": "This site appears comparatively current, with more targeted gaps.",
-        None: "This site has only partial evidence so far.",
-    }[score_payload.get("priority_tier")]
 
     findings_html = "".join(
         f"""
@@ -75,6 +114,9 @@ def render_html_report(
     if screenshots:
         for shot in screenshots:
             annotation_html = _render_annotations(shot.get("annotations", []))
+            note_html = ""
+            if shot.get("annotations") == []:
+                note_html = "<p class=\"screenshot-note\">No visual callouts were generated for this screenshot.</p>"
             screenshot_html += f"""
             <figure class=\"screenshot\">
               <div class=\"screenshot-frame\">
@@ -82,6 +124,7 @@ def render_html_report(
                 {annotation_html}
               </div>
               <figcaption>{escape(shot['viewport'].title())} screenshot</figcaption>
+              {note_html}
             </figure>
             """
     else:
@@ -115,6 +158,9 @@ def render_html_report(
     .annotation-point {{ border-radius: 999px; min-width: 18px; min-height: 18px; width: 18px !important; height: 18px !important; transform: translate(-50%, -50%); background: rgba(37, 99, 235, 0.25); }}
     .annotation-badge {{ position: absolute; top: -12px; left: -12px; background: #0f172a; color: #fff; font-size: 12px; border-radius: 999px; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; }}
     .annotation-captions {{ margin-top: 12px; padding-left: 20px; }}
+    .screenshot-note {{ margin-top: 8px; color: #475569; }}
+    .appendix-block {{ margin-bottom: 24px; break-inside: avoid; }}
+    .appendix-block pre {{ white-space: pre-wrap; background: #f8fafc; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; }}
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ border: 1px solid #d1d5db; padding: 8px; text-align: left; }}
     @media print {{ body {{ margin: 16px; }} .finding {{ break-inside: avoid; }} }}
@@ -130,8 +176,7 @@ def render_html_report(
 
   <section>
     <h2>Plain-Language Summary</h2>
-    <p>{escape(summary_sentence)}</p>
-    <p>The current overall opportunity score is {score_payload.get('overall_opportunity_score')}, with score coverage of {run['score_coverage']}.</p>
+    {_summary_paragraphs(score_payload, findings, run)}
     {_manual_review_note(run['manual_review_reasons'])}
   </section>
 
@@ -171,7 +216,7 @@ def render_html_report(
 
   <section>
     <h2>Technical Appendix</h2>
-    <pre>{escape(str(score_payload))}</pre>
+    {_render_appendix(technical_appendix)}
   </section>
 </body>
 </html>

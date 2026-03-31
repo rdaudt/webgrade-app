@@ -1,14 +1,24 @@
 from __future__ import annotations
 
+import sys
+import types
 import unittest
+from pathlib import Path
+import subprocess
+import tempfile
+from unittest.mock import patch
 
 import httpx
 
+from webgrade.adapters.accessibility import run_pa11y
+from webgrade.collectors.base import CatalogCollector, CollectorMetadata, CollectorOutput
 from webgrade.adapters.freshness import _extract_footer_year, _extract_visible_dates, _parse_cdx_timestamps
 from webgrade.adapters.pagespeed import _parse_categories
+from webgrade.adapters.screenshots import capture_screenshots
 from webgrade.adapters.security import grade_security_headers
 from webgrade.adapters.wappalyzer import inspect_technologies
 from webgrade.scoring.engine import compute_scores
+from webgrade.types import CatalogSite
 
 
 class AdapterParsingTests(unittest.TestCase):
@@ -70,6 +80,103 @@ class AdapterParsingTests(unittest.TestCase):
         self.assertEqual(summary["platform_status"], "supported_current")
         self.assertIn("Google Tag Manager", summary["analytics_tools"])
         self.assertTrue(summary["has_accessibility_toolbar"])
+
+    @patch("webgrade.adapters.accessibility._resolve_pa11y_command", return_value=["pa11y"])
+    @patch("webgrade.adapters.accessibility._execute_pa11y")
+    def test_pa11y_retries_once_before_success(
+        self,
+        mock_execute_pa11y: object,
+        _mock_resolve_pa11y_command: object,
+    ) -> None:
+        mock_execute_pa11y.side_effect = [
+            subprocess.CompletedProcess(args=["pa11y"], returncode=1, stdout="", stderr="temporary failure"),
+            subprocess.CompletedProcess(args=["pa11y"], returncode=0, stdout="[]", stderr=""),
+        ]
+        result = run_pa11y("https://example.com")
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["summary"]["issue_count_total"], 0)
+        self.assertEqual(mock_execute_pa11y.call_count, 2)
+
+    def test_screenshots_return_partial_when_one_viewport_fails(self) -> None:
+        class FakePage:
+            def __init__(self, viewport_name: str) -> None:
+                self.viewport_name = viewport_name
+                self.url = f"https://example.com/{viewport_name}"
+
+            def goto(self, url: str, wait_until: str, timeout: int) -> None:
+                if self.viewport_name == "mobile":
+                    raise RuntimeError("mobile timeout")
+
+            def wait_for_load_state(self, state: str, timeout: int) -> None:
+                return None
+
+            def screenshot(self, path: str, full_page: bool) -> None:
+                Path(path).write_bytes(b"PNG")
+
+            def title(self) -> str:
+                return f"{self.viewport_name.title()} Example"
+
+        class FakeContext:
+            def __init__(self, viewport_name: str) -> None:
+                self.viewport_name = viewport_name
+
+            def new_page(self) -> FakePage:
+                return FakePage(self.viewport_name)
+
+            def close(self) -> None:
+                return None
+
+        class FakeBrowser:
+            def new_context(self, viewport: dict[str, int], **kwargs: object) -> FakeContext:
+                viewport_name = "mobile" if viewport["width"] == 375 else "desktop"
+                return FakeContext(viewport_name)
+
+            def close(self) -> None:
+                return None
+
+        class FakePlaywrightContextManager:
+            def __enter__(self) -> object:
+                return types.SimpleNamespace(chromium=types.SimpleNamespace(launch=lambda headless: FakeBrowser()))
+
+            def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+                return None
+
+        fake_module = types.SimpleNamespace(sync_playwright=lambda: FakePlaywrightContextManager())
+
+        with tempfile.TemporaryDirectory() as tmp_dir, patch.dict(sys.modules, {"playwright.sync_api": fake_module}):
+            result, captures = capture_screenshots("https://example.com", Path(tmp_dir))
+            self.assertEqual(result["status"], "partial")
+            self.assertEqual(len(captures), 1)
+            self.assertEqual(captures[0]["viewport"], "desktop")
+            self.assertEqual(result["summary"]["failed_viewports"][0]["viewport"], "mobile")
+
+
+class CollectorStubTests(unittest.TestCase):
+    def test_collector_stub_exports_csv_compatible_rows(self) -> None:
+        class DemoCollector(CatalogCollector):
+            collector_key = "demo"
+
+            def collect(self) -> CollectorOutput:
+                return CollectorOutput(
+                    metadata=CollectorMetadata(collector_key="demo", source_label="Demo"),
+                    sites=[
+                        CatalogSite(
+                            url="https://example.com",
+                            name="Example",
+                            region="BC",
+                            population=1000,
+                            tier="A",
+                            notes='Quoted "note"',
+                        )
+                    ],
+                )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / "collector.csv"
+            DemoCollector().export_csv(output_path)
+            csv_text = output_path.read_text(encoding="utf-8")
+            self.assertIn('"https://example.com"', csv_text)
+            self.assertIn('"Quoted ""note"""', csv_text)
 
 
 class ScoringTests(unittest.TestCase):
