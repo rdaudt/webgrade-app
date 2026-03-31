@@ -8,3 +8,7 @@ __pycache__/
 webgrade-output/
 tmp-webgrade-smoke/
 *.egg-info/
+pilot_*.csv
+tests/gpt54_vision_test.py
+tests/pipoca.JPG
+specs/clinton_website_assessment_report.html
