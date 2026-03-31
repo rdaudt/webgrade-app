@@ -13,7 +13,10 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e .
+python -m playwright install chromium
 ```
+
+Copy [.env.example](C:/Users/Carboteiro/projects/webgrade-app/.env.example) to `.env` and set the variables you plan to use.
 
 ### Run tests
 
@@ -25,6 +28,14 @@ python -m pip install -e .
 
 ```powershell
 .\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output
+```
+
+### Useful flags
+
+```powershell
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output --skip-vision
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output --skip-screenshots
+.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --output .\webgrade-output --only-vision
 ```
 
 ## Current State
@@ -43,3 +54,12 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 - missing `OPENAI_API_KEY`
 - network timeouts during screenshot capture
 - PageSpeed API throttling (`429`)
+
+## Operator Notes
+
+- `OPENAI_API_KEY` is required only when vision scoring is enabled.
+- `PAGESPEED_API_KEY` is optional but recommended to improve quota headroom.
+- `OPENAI_VISION_MODEL` defaults to `gpt-5`.
+- `WEBGRADE_VISION_DELAY_SECONDS` adds a delay between screenshot-scoring calls if you need to slow the vision stage down.
+
+For a fuller workflow, rerun behavior, and troubleshooting guide, see [docs/operator-runbook.md](C:/Users/Carboteiro/projects/webgrade-app/docs/operator-runbook.md).
