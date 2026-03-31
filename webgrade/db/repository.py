@@ -123,6 +123,116 @@ class Database:
         )
         self.connection.commit()
 
+    def add_adapter_result(
+        self,
+        run_id: int,
+        adapter_key: str,
+        viewport: str | None,
+        status: str,
+        summary: dict[str, Any],
+        raw: dict[str, Any],
+        error: dict[str, Any] | None = None,
+        copied_from_result_id: int | None = None,
+    ) -> int:
+        cursor = self.connection.execute(
+            """
+            INSERT INTO adapter_results (
+                run_id, adapter_key, viewport, status, started_at, finished_at,
+                summary_json, raw_json, error_json, copied_from_result_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                adapter_key,
+                viewport,
+                status,
+                _utc_now(),
+                _utc_now(),
+                json.dumps(summary, sort_keys=True),
+                json.dumps(raw, sort_keys=True),
+                json.dumps(error, sort_keys=True) if error is not None else None,
+                copied_from_result_id,
+            ),
+        )
+        self.connection.commit()
+        return int(cursor.lastrowid)
+
+    def replace_run_scores(
+        self,
+        run_id: int,
+        scores: list[dict[str, Any]],
+    ) -> None:
+        self.connection.execute("DELETE FROM scores WHERE run_id = ?", (run_id,))
+        self.connection.executemany(
+            """
+            INSERT INTO scores (run_id, dimension, raw_value, opportunity_score, source_coverage, viewport, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    run_id,
+                    item["dimension"],
+                    item.get("raw_value"),
+                    item["opportunity_score"],
+                    item["source_coverage"],
+                    item["viewport"],
+                    item["source"],
+                )
+                for item in scores
+            ],
+        )
+        self.connection.commit()
+
+    def replace_run_findings(self, run_id: int, findings: list[dict[str, Any]]) -> None:
+        self.connection.execute("DELETE FROM findings WHERE run_id = ?", (run_id,))
+        self.connection.executemany(
+            """
+            INSERT INTO findings (run_id, finding_key, severity, plain_text, framing_tags, effort, raw_evidence)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    run_id,
+                    item["finding_key"],
+                    item["severity"],
+                    item["plain_text"],
+                    json.dumps(item["framing_tags"], sort_keys=True),
+                    item["effort"],
+                    json.dumps(item["raw_evidence"], sort_keys=True),
+                )
+                for item in findings
+            ],
+        )
+        self.connection.commit()
+
+    def add_screenshot(
+        self,
+        run_id: int,
+        viewport: str,
+        file_path: str,
+        status: str,
+        metadata: dict[str, Any] | None = None,
+        source_run_id: int | None = None,
+    ) -> int:
+        cursor = self.connection.execute(
+            """
+            INSERT INTO screenshots (run_id, viewport, file_path, captured_at, status, source_run_id, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                viewport,
+                file_path,
+                _utc_now(),
+                status,
+                source_run_id,
+                json.dumps(metadata or {}, sort_keys=True),
+            ),
+        )
+        self.connection.commit()
+        return int(cursor.lastrowid)
+
     def add_artifact(self, batch_id: int | None, run_id: int | None, artifact_type: str, relative_path: str, metadata: dict[str, Any] | None = None) -> None:
         self.connection.execute(
             """
@@ -159,6 +269,41 @@ class Database:
         ).fetchall()
         return list(rows)
 
+    def list_run_adapter_results(self, run_id: int) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            "SELECT * FROM adapter_results WHERE run_id = ? ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        return list(rows)
+
+    def list_run_scores(self, run_id: int) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            "SELECT * FROM scores WHERE run_id = ? ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        return list(rows)
+
+    def list_run_findings(self, run_id: int) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            "SELECT * FROM findings WHERE run_id = ? ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        return list(rows)
+
+    def list_run_screenshots(self, run_id: int) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            "SELECT * FROM screenshots WHERE run_id = ? ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        return list(rows)
+
+    def list_run_artifacts(self, run_id: int) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            "SELECT * FROM artifacts WHERE run_id = ? ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        return list(rows)
+
     def list_batch_artifacts(self, batch_id: int) -> list[sqlite3.Row]:
         rows = self.connection.execute(
             "SELECT * FROM artifacts WHERE batch_id = ? ORDER BY id",
@@ -169,16 +314,33 @@ class Database:
     def prior_run_has_screenshots(self, url: str) -> bool:
         row = self.connection.execute(
             """
-            SELECT screenshots.id
+            SELECT COUNT(DISTINCT screenshots.viewport) AS viewport_count
             FROM screenshots
             JOIN runs ON screenshots.run_id = runs.id
             JOIN sites ON runs.site_id = sites.id
             WHERE sites.url = ?
-            LIMIT 1
             """,
             (url,),
         ).fetchone()
-        return row is not None
+        return row is not None and int(row["viewport_count"] or 0) >= 2
+
+    def find_latest_run_with_screenshots(self, site_id: int) -> sqlite3.Row | None:
+        return self.connection.execute(
+            """
+            SELECT runs.*
+            FROM runs
+            JOIN (
+                SELECT run_id
+                FROM screenshots
+                GROUP BY run_id
+                HAVING COUNT(DISTINCT viewport) >= 2
+            ) eligible_runs ON eligible_runs.run_id = runs.id
+            WHERE runs.site_id = ?
+            ORDER BY runs.id DESC
+            LIMIT 1
+            """,
+            (site_id,),
+        ).fetchone()
 
     def __enter__(self) -> Database:
         return self

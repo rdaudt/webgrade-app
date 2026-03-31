@@ -6,6 +6,18 @@ from pathlib import Path
 from webgrade.db import Database
 
 
+COMPOSITE_DIMENSIONS = {
+    "mobile_usability",
+    "accessibility",
+    "technology_stack_modernity",
+    "performance",
+    "visual_design_era",
+    "seo_fundamentals",
+    "security_posture",
+    "content_freshness",
+}
+
+
 def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
     batch = db.get_batch(batch_id)
     runs = db.list_batch_runs(batch_id)
@@ -13,6 +25,44 @@ def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
 
     site_items: list[dict[str, object]] = []
     for run in runs:
+        adapter_rows = db.list_run_adapter_results(run["id"])
+        adapter_payload = {
+            row["adapter_key"]: {
+                "status": row["status"],
+                "viewport": row["viewport"],
+                "summary": json.loads(row["summary_json"]),
+                "error": json.loads(row["error_json"]) if row["error_json"] else None,
+            }
+            for row in adapter_rows
+        }
+        score_rows = db.list_run_scores(run["id"])
+        findings_rows = db.list_run_findings(run["id"])
+        screenshot_rows = db.list_run_screenshots(run["id"])
+        run_artifacts = db.list_run_artifacts(run["id"])
+        score_map = {
+            row["dimension"]: {
+                "opportunity_score": row["opportunity_score"],
+                "source_coverage": row["source_coverage"],
+            }
+            for row in score_rows
+            if row["dimension"] in COMPOSITE_DIMENSIONS
+        }
+        overall_score = next((row["opportunity_score"] for row in score_rows if row["dimension"] == "overall_opportunity_score"), None)
+        priority_tier = None
+        desktop_snapshot = None
+        mobile_snapshot = None
+        for row in score_rows:
+            if row["dimension"] == "priority_tier":
+                priority_tier = row["source"]
+            elif row["dimension"] == "desktop_quality_snapshot":
+                desktop_snapshot = row["opportunity_score"]
+            elif row["dimension"] == "mobile_quality_snapshot":
+                mobile_snapshot = row["opportunity_score"]
+        report_map = {
+            row["artifact_type"]: row["relative_path"]
+            for row in run_artifacts
+            if row["artifact_type"] in {"html_report", "pdf_report"}
+        }
         site_items.append(
             {
                 "site": {
@@ -34,22 +84,41 @@ def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
                     "manual_review_reasons": json.loads(run["manual_review_json"]),
                 },
                 "scores": {
-                    "overall_opportunity_score": None,
-                    "priority_tier": None,
-                    "dimensions": {},
-                    "desktop_quality_snapshot": None,
-                    "mobile_quality_snapshot": None,
+                    "overall_opportunity_score": overall_score,
+                    "priority_tier": priority_tier,
+                    "dimensions": score_map,
+                    "desktop_quality_snapshot": desktop_snapshot,
+                    "mobile_quality_snapshot": mobile_snapshot,
                 },
-                "findings": [],
+                "findings": [
+                    {
+                        "finding_key": row["finding_key"],
+                        "severity": row["severity"],
+                        "plain_text": row["plain_text"],
+                        "framing_tags": json.loads(row["framing_tags"]),
+                        "effort": row["effort"],
+                        "raw_evidence": json.loads(row["raw_evidence"]),
+                    }
+                    for row in findings_rows
+                ],
                 "screenshots": {
-                    "desktop": None,
-                    "mobile": None,
+                    "desktop": next((row["file_path"] for row in screenshot_rows if row["viewport"] == "desktop"), None),
+                    "mobile": next((row["file_path"] for row in screenshot_rows if row["viewport"] == "mobile"), None),
+                    "items": [
+                        {
+                            "viewport": row["viewport"],
+                            "relative_path": row["file_path"],
+                            "status": row["status"],
+                            "metadata": json.loads(row["metadata_json"]),
+                        }
+                        for row in screenshot_rows
+                    ],
                 },
                 "reports": {
-                    "html": None,
-                    "pdf": None,
+                    "html": report_map.get("html_report"),
+                    "pdf": report_map.get("pdf_report"),
                 },
-                "adapters": {},
+                "adapters": adapter_payload,
             }
         )
 
@@ -74,6 +143,7 @@ def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
             {
                 "artifact_type": row["artifact_type"],
                 "relative_path": row["relative_path"],
+                "metadata": json.loads(row["metadata_json"]),
             }
             for row in artifacts
         ],

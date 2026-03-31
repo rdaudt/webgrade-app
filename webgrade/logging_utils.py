@@ -23,3 +23,10 @@ def configure_logging(log_path: Path) -> logging.Logger:
     logger.addHandler(stream_handler)
 
     return logger
+
+
+def close_logging(logger: logging.Logger) -> None:
+    for handler in list(logger.handlers):
+        handler.flush()
+        handler.close()
+        logger.removeHandler(handler)
