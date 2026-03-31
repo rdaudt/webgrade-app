@@ -63,3 +63,13 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 - `WEBGRADE_VISION_DELAY_SECONDS` adds a delay between screenshot-scoring calls if you need to slow the vision stage down.
 
 For a fuller workflow, rerun behavior, and troubleshooting guide, see [docs/operator-runbook.md](C:/Users/Carboteiro/projects/webgrade-app/docs/operator-runbook.md).
+
+## Contribution Workflow
+
+Tracked changes should go through a feature branch and pull request before merging to `main`.
+
+- create a branch from `main`
+- keep the PR scoped to one coherent change
+- leave pilot catalogs, ad hoc test scripts, and exploratory report drafts as local-only files unless they are intentionally promoted in their own PR
+
+See [CONTRIBUTING.md](C:/Users/Carboteiro/projects/webgrade-app/CONTRIBUTING.md) for the working rules.
