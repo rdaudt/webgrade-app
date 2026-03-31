@@ -6,7 +6,7 @@ import time
 from typing import Any, Literal
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI, RateLimitError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 
 class VisionDimension(BaseModel):
@@ -44,7 +44,13 @@ class VisionAssessment(BaseModel):
 
 def _image_to_data_url(path: Path) -> str:
     suffix = path.suffix.lower()
-    mime = "image/png" if suffix == ".png" else "image/jpeg"
+    mime = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }.get(suffix, "image/jpeg")
     encoded = b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
 
@@ -56,7 +62,10 @@ def _instructions(viewport: str, site_url: str) -> str:
         "Score each design dimension from 1 to 10 where 10 means current, clear, and strong quality, "
         "and 1 means visibly weak or outdated quality. "
         "Use only what is visible in the screenshot. "
+        "Return compact JSON only. "
+        "Keep each rationale under 18 words. "
         "Return up to 3 annotations for visible issues only, with normalized coordinates from 0.0 to 1.0. "
+        "Keep each annotation title under 8 words and each caption under 18 words. "
         "Use kind='rect' for boxes and kind='point' only when a box is not appropriate. "
         "If the screenshot does not show enough evidence for a dimension, still provide your best visible-only score and rationale."
     )
@@ -75,9 +84,8 @@ def _single_vision_result(
         model=model,
         reasoning={"effort": "high"},
         text_format=VisionAssessment,
-        max_output_tokens=1400,
+        max_output_tokens=2200,
         store=False,
-        temperature=0,
         input=[
             {
                 "role": "user",
@@ -140,7 +148,7 @@ def run_vision_for_captures(
                 if attempt == 2:
                     break
                 time.sleep(2**attempt)
-            except (APIConnectionError, APITimeoutError, APIStatusError, RuntimeError) as exc:
+            except (APIConnectionError, APITimeoutError, APIStatusError, RuntimeError, ValidationError) as exc:
                 last_error = exc
                 if isinstance(exc, APIStatusError) and exc.status_code == 429 and attempt < 2:
                     time.sleep(2**attempt)

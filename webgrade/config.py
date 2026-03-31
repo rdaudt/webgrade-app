@@ -42,7 +42,7 @@ def load_settings(output_dir: Path | None) -> Settings:
         output_root=output_root,
         db_path=output_root / DB_FILE_NAME,
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        openai_vision_model=os.getenv("OPENAI_VISION_MODEL", "gpt-5"),
+        openai_vision_model=os.getenv("OPENAI_VISION_MODEL", "gpt-5.4"),
         vision_delay_seconds=float(os.getenv("WEBGRADE_VISION_DELAY_SECONDS", "0.0")),
         pagespeed_api_key=os.getenv("PAGESPEED_API_KEY"),
     )

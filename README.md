@@ -59,7 +59,7 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 
 - `OPENAI_API_KEY` is required only when vision scoring is enabled.
 - `PAGESPEED_API_KEY` is optional but recommended to improve quota headroom.
-- `OPENAI_VISION_MODEL` defaults to `gpt-5`.
+- `OPENAI_VISION_MODEL` defaults to `gpt-5.4`.
 - `WEBGRADE_VISION_DELAY_SECONDS` adds a delay between screenshot-scoring calls if you need to slow the vision stage down.
 
 For a fuller workflow, rerun behavior, and troubleshooting guide, see [docs/operator-runbook.md](C:/Users/Carboteiro/projects/webgrade-app/docs/operator-runbook.md).
