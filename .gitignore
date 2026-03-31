@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.sqlite3
+*.log
+webgrade-output/
+tmp-webgrade-smoke/
+*.egg-info/
