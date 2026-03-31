@@ -27,15 +27,15 @@ Copy [.env.example](C:/Users/Carboteiro/projects/webgrade-app/.env.example) to `
 ### Run the CLI
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --context .\docs\context-templates\context-municipal.md --output .\webgrade-output
 ```
 
 ### Useful flags
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output --skip-vision
-.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output --skip-screenshots
-.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --output .\webgrade-output --only-vision
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --context .\docs\context-templates\context-municipal.md --output .\webgrade-output --skip-vision
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --context .\docs\context-templates\context-municipal.md --output .\webgrade-output --skip-screenshots
+.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --context .\docs\context-templates\context-municipal.md --output .\webgrade-output --only-vision
 ```
 
 ## Current State
@@ -46,6 +46,7 @@ The current implementation covers the main v1 pipeline:
 - technical audit adapters for PageSpeed, security/TLS, freshness, DOM heuristics, and Wappalyzer-style technology detection
 - Playwright screenshots and Pa11y accessibility checks
 - OpenAI vision scoring with structured output and `--only-vision` reuse support
+- required run-level `context.md` input with audience-family-aware report framing
 - deterministic scoring, findings, HTML reports, PDF exports, Excel export, and JSON export
 
 Runs may still finish as `partial` when requested stages fail in the local environment, for example:
@@ -61,6 +62,7 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 - `PAGESPEED_API_KEY` is optional but recommended to improve quota headroom.
 - `OPENAI_VISION_MODEL` defaults to `gpt-5.4`.
 - `WEBGRADE_VISION_DELAY_SECONDS` adds a delay between screenshot-scoring calls if you need to slow the vision stage down.
+- `--context` is required for report-generating runs and should usually point to one of the starter templates in [docs/context-templates](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates).
 
 For a fuller workflow, rerun behavior, and troubleshooting guide, see [docs/operator-runbook.md](C:/Users/Carboteiro/projects/webgrade-app/docs/operator-runbook.md).
 

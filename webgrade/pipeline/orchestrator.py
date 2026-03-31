@@ -24,6 +24,7 @@ from webgrade.adapters import (
 )
 from webgrade.catalog import load_catalog, load_single_site
 from webgrade.config import Settings
+from webgrade.context import load_report_context
 from webgrade.db import Database
 from webgrade.exporters import export_catalog_excel, export_catalog_json
 from webgrade.logging_utils import close_logging, configure_logging, log_event
@@ -396,6 +397,7 @@ def _render_site_reports(
     screenshots: list[dict[str, Any]],
     manual_review_reasons: list[str],
     adapter_results: dict[str, dict[str, Any]],
+    report_context: dict[str, Any],
     logger: Any,
 ) -> list[str]:
     extra_manual_review_reasons: list[str] = []
@@ -410,6 +412,7 @@ def _render_site_reports(
         "finished_at": datetime.now(tz=UTC).replace(microsecond=0).isoformat(),
         "score_coverage": score_payload["score_coverage"],
         "manual_review_reasons": manual_review_reasons,
+        "context_summary": report_context,
     }
     html_render_screenshots = [
         {
@@ -421,6 +424,7 @@ def _render_site_reports(
     ]
     technical_appendix = {
         "scores": score_payload,
+        "report_context": report_context,
         "manual_review": {"reasons": manual_review_reasons},
         "screenshots": [
             {
@@ -453,6 +457,8 @@ def _render_site_reports(
             findings=findings,
             screenshots=html_render_screenshots,
             technical_appendix=technical_appendix,
+            report_context=report_context,
+            adapter_summaries={key: value.get("summary", {}) for key, value in adapter_results.items()},
             output_path=html_path,
         )
         relative_html = html_output.relative_to(batch_dir).as_posix()
@@ -482,6 +488,7 @@ def _finalize_site_run(
     site: CatalogSite,
     settings: Settings,
     options: RunOptions,
+    report_context: dict[str, Any],
     logger: Any,
 ) -> tuple[str, float, list[str]]:
     adapter_results: dict[str, dict[str, Any]] = {}
@@ -556,6 +563,7 @@ def _finalize_site_run(
         screenshots=screenshots,
         manual_review_reasons=manual_review_reasons,
         adapter_results=adapter_results,
+        report_context=report_context,
         logger=logger,
     )
     manual_review_reasons.extend(report_review_reasons)
@@ -567,6 +575,10 @@ def _finalize_site_run(
 
 def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
     sites = _load_sites(options)
+    if options.context_path is None:
+        raise ValueError("--context is required for report-generating runs")
+    context_raw_markdown, parsed_context = load_report_context(options.context_path)
+    context_summary = parsed_context.to_summary()
 
     with Database(settings.db_path) as db:
         db.initialize()
@@ -580,10 +592,13 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
                 )
 
         batch_dir = settings.create_batch_dir()
+        context_output_path = batch_dir / "context.md"
+        context_output_path.write_text(context_raw_markdown, encoding="utf-8")
         logger = configure_logging(batch_dir / "webgrade.log")
         flags = {
             "input": str(options.input_path) if options.input_path else None,
             "output": str(options.output_dir),
+            "context": str(options.context_path),
             "limit": options.limit,
             "skip_vision": options.skip_vision,
             "skip_screenshots": options.skip_screenshots,
@@ -596,7 +611,10 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
             output_dir=batch_dir.name,
             flags=flags,
             site_count_total=len(sites),
+            context_raw_markdown=context_raw_markdown,
+            context_summary=context_summary,
         )
+        db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="context_file", relative_path="context.md")
 
         log_event(logger, logging.INFO, f"Created batch {batch_id} with {len(sites)} site(s)", batch_id=batch_id, stage="batch")
 
@@ -614,6 +632,7 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
                     site_id=site_id,
                     report_name_override=options.report_name if options.site else None,
                     source_run_id=int(source_run["id"]) if source_run is not None else None,
+                    context_summary=context_summary,
                 )
                 status, score_coverage, manual_review_reasons = _finalize_site_run(
                     db=db,
@@ -624,6 +643,7 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
                     site=site,
                     settings=settings,
                     options=options,
+                    report_context=context_summary,
                     logger=logger,
                 )
                 db.finalize_run(run_id, status=status, score_coverage=score_coverage, manual_review_reasons=manual_review_reasons)

@@ -40,36 +40,44 @@ Run the automated checks before the first real batch:
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
+Pick the context template that matches the audience family for the batch:
+
+- [context-municipal.md](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates/context-municipal.md)
+- [context-for-profit.md](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates/context-for-profit.md)
+- [context-nonprofit.md](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates/context-nonprofit.md)
+
+Copy the appropriate template and edit it for the run before launching the batch.
+
 ## Common Commands
 
 Full batch:
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --context .\docs\context-templates\context-municipal.md --output .\webgrade-output
 ```
 
 Skip vision:
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output --skip-vision
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --context .\docs\context-templates\context-municipal.md --output .\webgrade-output --skip-vision
 ```
 
 Skip screenshots and vision:
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --output .\webgrade-output --skip-screenshots --skip-vision
+.\.venv\Scripts\python.exe -m webgrade run --input sample_catalog.csv --context .\docs\context-templates\context-municipal.md --output .\webgrade-output --skip-screenshots --skip-vision
 ```
 
 Single site:
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --report-name "Example Report" --output .\webgrade-output
+.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --context .\docs\context-templates\context-municipal.md --report-name "Example Report" --output .\webgrade-output
 ```
 
 Reuse prior screenshots and technical evidence, then run vision only:
 
 ```powershell
-.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --output .\webgrade-output --only-vision
+.\.venv\Scripts\python.exe -m webgrade run --site https://example.com --context .\docs\context-templates\context-municipal.md --output .\webgrade-output --only-vision
 ```
 
 ## Output Layout
@@ -81,6 +89,7 @@ webgrade-output/
   webgrade.sqlite3
   2026-03-31T17-00-00Z/
     webgrade.log
+    context.md
     catalog.xlsx
     catalog.json
     reports/
@@ -99,6 +108,11 @@ Artifacts are also recorded in SQLite for later inspection.
   - Requires an existing prior run with both screenshots.
   - Reuses technical evidence and screenshots into a new run.
   - Executes only the vision, scoring, findings, and reporting path.
+
+`--context` is required for report-generating runs. The batch stores:
+
+- the raw `context.md` used for that run
+- a normalized context summary in SQLite and `catalog.json`
 
 Intentional skips do not force a run to `partial`. Requested-stage failures do.
 

@@ -81,6 +81,7 @@ def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
                     "finished_at": run["finished_at"],
                     "score_coverage": run["score_coverage"],
                     "report_name_override": run["report_name_override"],
+                    "context": json.loads(run["context_summary_json"]),
                     "manual_review_reasons": json.loads(run["manual_review_json"]),
                 },
                 "scores": {
@@ -132,6 +133,7 @@ def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
             "input_path": batch["input_path"],
             "output_dir": batch["output_dir"],
             "flags": json.loads(batch["flags_json"]),
+            "context": json.loads(batch["context_summary_json"]),
             "summary": {
                 "site_count_total": batch["site_count_total"],
                 "site_count_complete": batch["site_count_complete"],
