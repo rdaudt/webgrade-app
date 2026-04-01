@@ -19,6 +19,7 @@ class Settings:
     openai_api_key: str | None
     openai_vision_model: str
     vision_delay_seconds: float
+    openai_vision_max_output_tokens: int
     openai_vision_input_cost_per_1m_tokens: float | None
     openai_vision_output_cost_per_1m_tokens: float | None
     pagespeed_api_key: str | None
@@ -53,6 +54,7 @@ def load_settings(output_dir: Path | None) -> Settings:
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_vision_model=os.getenv("OPENAI_VISION_MODEL", "gpt-5.4"),
         vision_delay_seconds=float(os.getenv("WEBGRADE_VISION_DELAY_SECONDS", "0.0")),
+        openai_vision_max_output_tokens=int(os.getenv("OPENAI_VISION_MAX_OUTPUT_TOKENS", "2200")),
         openai_vision_input_cost_per_1m_tokens=_optional_float_from_env("OPENAI_VISION_INPUT_COST_PER_1M_TOKENS"),
         openai_vision_output_cost_per_1m_tokens=_optional_float_from_env("OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS"),
         pagespeed_api_key=os.getenv("PAGESPEED_API_KEY"),

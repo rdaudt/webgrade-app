@@ -29,6 +29,7 @@ Recommended variables:
 OPENAI_API_KEY=...
 OPENAI_VISION_MODEL=gpt-5.4
 WEBGRADE_VISION_DELAY_SECONDS=0.0
+OPENAI_VISION_MAX_OUTPUT_TOKENS=2200
 OPENAI_VISION_INPUT_COST_PER_1M_TOKENS=
 OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS=
 PAGESPEED_API_KEY=...
@@ -140,6 +141,7 @@ Intentional skips do not force a run to `partial`. Requested-stage failures do.
 - Screenshot capture can still fail on some slow or restrictive sites even with one retry.
 - PDF generation requires Playwright browser binaries installed in the active venv environment.
 - Vision scoring requires valid screenshots and `OPENAI_API_KEY`.
+- `OPENAI_VISION_MAX_OUTPUT_TOKENS` controls the maximum structured-output budget per screenshot call. Increase it cautiously if you are seeing truncated JSON.
 - Vision cost is only estimated when `OPENAI_VISION_INPUT_COST_PER_1M_TOKENS` and `OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS` are set.
 - Technology detection is heuristic and should be treated as best-effort.
 

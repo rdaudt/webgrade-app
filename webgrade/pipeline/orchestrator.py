@@ -374,6 +374,7 @@ def _run_vision_stage(
             api_key=settings.openai_api_key,
             model=settings.openai_vision_model,
             delay_seconds=settings.vision_delay_seconds,
+            max_output_tokens=settings.openai_vision_max_output_tokens,
         )
     except Exception as exc:  # noqa: BLE001
         log_event(logger, logging.WARNING, f"Vision scoring failed for {site.url}: {exc}", stage="vision")

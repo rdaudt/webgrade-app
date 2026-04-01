@@ -35,6 +35,7 @@ class VisionSmokeTests(unittest.TestCase):
             api_key=VISION_API_KEY,
             model=os.getenv("OPENAI_VISION_MODEL", "gpt-5.4"),
             delay_seconds=0.0,
+            max_output_tokens=int(os.getenv("OPENAI_VISION_MAX_OUTPUT_TOKENS", "2200")),
         )
 
         self.assertEqual(len(results), 1)
