@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS batches (
     input_path TEXT,
     output_dir TEXT NOT NULL,
     flags_json TEXT NOT NULL,
+    context_raw_markdown TEXT NOT NULL DEFAULT '',
+    context_summary_json TEXT NOT NULL DEFAULT '{}',
     site_count_total INTEGER NOT NULL DEFAULT 0,
     site_count_complete INTEGER NOT NULL DEFAULT 0,
     site_count_partial INTEGER NOT NULL DEFAULT 0,
@@ -34,6 +36,7 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT NOT NULL,
     report_name_override TEXT,
     source_run_id INTEGER REFERENCES runs(id),
+    context_summary_json TEXT NOT NULL DEFAULT '{}',
     score_coverage REAL NOT NULL DEFAULT 0.0,
     manual_review_json TEXT NOT NULL DEFAULT '[]'
 );

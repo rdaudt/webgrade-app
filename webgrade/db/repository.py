@@ -28,7 +28,18 @@ class Database:
         schema_path = Path(__file__).with_name("schema.sql")
         with schema_path.open("r", encoding="utf-8") as handle:
             self.connection.executescript(handle.read())
+        self._ensure_column("batches", "context_raw_markdown", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column("batches", "context_summary_json", "TEXT NOT NULL DEFAULT '{}'")
+        self._ensure_column("runs", "context_summary_json", "TEXT NOT NULL DEFAULT '{}'")
         self.connection.commit()
+
+    def _ensure_column(self, table_name: str, column_name: str, column_sql: str) -> None:
+        existing = {
+            row["name"]
+            for row in self.connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name not in existing:
+            self.connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_sql if column_sql.startswith(column_name) else column_name + ' ' + column_sql}")
 
     def upsert_site(self, site: CatalogSite) -> int:
         existing = self.connection.execute(
@@ -61,15 +72,32 @@ class Database:
         self.connection.commit()
         return int(cursor.lastrowid)
 
-    def create_batch(self, input_path: str | None, output_dir: str, flags: dict[str, Any], site_count_total: int) -> int:
+    def create_batch(
+        self,
+        input_path: str | None,
+        output_dir: str,
+        flags: dict[str, Any],
+        site_count_total: int,
+        context_raw_markdown: str,
+        context_summary: dict[str, Any],
+    ) -> int:
         cursor = self.connection.execute(
             """
             INSERT INTO batches (
-                started_at, status, input_path, output_dir, flags_json, site_count_total
+                started_at, status, input_path, output_dir, flags_json, context_raw_markdown, context_summary_json, site_count_total
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (_utc_now(), "partial", input_path, output_dir, json.dumps(flags, sort_keys=True), site_count_total),
+            (
+                _utc_now(),
+                "partial",
+                input_path,
+                output_dir,
+                json.dumps(flags, sort_keys=True),
+                context_raw_markdown,
+                json.dumps(context_summary, sort_keys=True),
+                site_count_total,
+            ),
         )
         self.connection.commit()
         return int(cursor.lastrowid)
@@ -96,15 +124,32 @@ class Database:
         )
         self.connection.commit()
 
-    def create_run(self, batch_id: int, site_id: int, report_name_override: str | None = None, source_run_id: int | None = None) -> int:
+    def create_run(
+        self,
+        batch_id: int,
+        site_id: int,
+        report_name_override: str | None = None,
+        source_run_id: int | None = None,
+        context_summary: dict[str, Any] | None = None,
+    ) -> int:
         cursor = self.connection.execute(
             """
             INSERT INTO runs (
-                batch_id, site_id, started_at, status, report_name_override, source_run_id, score_coverage, manual_review_json
+                batch_id, site_id, started_at, status, report_name_override, source_run_id, context_summary_json, score_coverage, manual_review_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (batch_id, site_id, _utc_now(), "partial", report_name_override, source_run_id, 0.0, "[]"),
+            (
+                batch_id,
+                site_id,
+                _utc_now(),
+                "partial",
+                report_name_override,
+                source_run_id,
+                json.dumps(context_summary or {}, sort_keys=True),
+                0.0,
+                "[]",
+            ),
         )
         self.connection.commit()
         return int(cursor.lastrowid)

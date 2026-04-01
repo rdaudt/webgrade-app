@@ -129,6 +129,7 @@ class CliIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
             input_csv = temp_root / "catalog.csv"
+            context_path = self._write_context(temp_root)
             input_csv.write_text(
                 "url,name\nhttps://example.com,Example\nhttps://example.org,Example Org\n",
                 encoding="utf-8",
@@ -140,6 +141,8 @@ class CliIntegrationTests(unittest.TestCase):
                     "run",
                     "--input",
                     str(input_csv),
+                    "--context",
+                    str(context_path),
                     "--output",
                     str(output_dir),
                     "--skip-vision",
@@ -157,6 +160,8 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertEqual(payload["batch"]["summary"]["site_count_complete"], 2)
             self.assertEqual(payload["batch"]["summary"]["site_count_partial"], 0)
             self.assertEqual(len(payload["sites"]), 2)
+            self.assertEqual(payload["batch"]["context"]["audience_family"], "municipal")
+            self.assertEqual(payload["sites"][0]["run"]["context"]["audience_family"], "municipal")
             self.assertEqual(
                 payload["sites"][0]["scores"]["overall_opportunity_score"],
                 payload["sites"][1]["scores"]["overall_opportunity_score"],
@@ -167,14 +172,22 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertTrue(payload["sites"][0]["reports"]["html"])
             self.assertTrue(payload["sites"][0]["reports"]["pdf"])
             self.assertEqual(payload["sites"][0]["run"]["status"], "complete")
+            report_html = (batch_dir / payload["sites"][0]["reports"]["html"]).read_text(encoding="utf-8")
+            self.assertIn("Digital Presence Readiness", report_html)
+            self.assertIn("What the site is doing well", report_html)
+            self.assertIn("This assessment covers the municipal website only in this run.", report_html)
+            self.assertTrue((batch_dir / "context.md").exists())
 
     def test_report_name_requires_site(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
+            context_path = self._write_context(Path(tmp_dir))
             exit_code = main(
                 [
                     "run",
                     "--input",
                     str(Path(tmp_dir) / "missing.csv"),
+                    "--context",
+                    str(context_path),
                     "--report-name",
                     "Example",
                 ]
@@ -287,6 +300,7 @@ class CliIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             temp_root = Path(tmp_dir)
             input_csv = temp_root / "catalog.csv"
+            context_path = self._write_context(temp_root)
             input_csv.write_text("url,name\nhttps://example.com,Example\n", encoding="utf-8")
             output_dir = temp_root / "output"
 
@@ -295,6 +309,8 @@ class CliIntegrationTests(unittest.TestCase):
                     "run",
                     "--input",
                     str(input_csv),
+                    "--context",
+                    str(context_path),
                     "--output",
                     str(output_dir),
                     "--skip-vision",
@@ -309,6 +325,8 @@ class CliIntegrationTests(unittest.TestCase):
                     "run",
                     "--site",
                     "https://example.com",
+                    "--context",
+                    str(context_path),
                     "--output",
                     str(output_dir),
                     "--only-vision",
@@ -326,6 +344,7 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertIn("vision_desktop", payload["sites"][0]["adapters"])
             self.assertTrue(payload["sites"][0]["screenshots"]["desktop"])
             self.assertTrue(payload["sites"][0]["reports"]["html"])
+            self.assertEqual(payload["sites"][0]["run"]["context"]["audience_family"], "municipal")
 
     @staticmethod
     def _fake_capture_screenshots(url: str, output_dir: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
@@ -411,6 +430,30 @@ class CliIntegrationTests(unittest.TestCase):
                 }
             )
         return results
+
+    @staticmethod
+    def _write_context(root: Path) -> Path:
+        context_path = root / "context.md"
+        context_path.write_text(
+            """# Run Context
+
+## Audience Family
+municipal
+
+## Primary Stakeholders
+- municipal councillors
+- residents
+
+## Organizational Goals
+- improve access to public information
+- reduce avoidable staff calls
+
+## Scope Notes
+- This assessment covers the municipal website only in this run.
+""",
+            encoding="utf-8",
+        )
+        return context_path
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Run a WebGrade batch")
     run_parser.add_argument("--input", type=Path, help="Path to input CSV.")
     run_parser.add_argument("--output", type=Path, default=Path("./webgrade-output"), help="Output directory.")
+    run_parser.add_argument("--context", type=Path, help="Path to the run-level context markdown file.")
     run_parser.add_argument("--limit", type=int, help="Process only the first N rows.")
     run_parser.add_argument("--skip-vision", action="store_true", help="Skip GPT-5.4 vision scoring.")
     run_parser.add_argument("--skip-screenshots", action="store_true", help="Skip screenshot capture.")
@@ -28,6 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
 def _validate_args(args: argparse.Namespace) -> None:
     if args.input is None and not args.site:
         raise ValueError("--input is required unless --site is used")
+    if args.context is None:
+        raise ValueError("--context is required for report-generating runs")
     if args.only_vision and args.skip_vision:
         raise ValueError("--only-vision cannot be combined with --skip-vision")
     if args.only_vision and args.skip_screenshots:
@@ -46,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         options = RunOptions(
             input_path=args.input,
             output_dir=args.output,
+            context_path=args.context,
             limit=args.limit,
             skip_vision=args.skip_vision,
             skip_screenshots=args.skip_screenshots,
