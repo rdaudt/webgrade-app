@@ -12,11 +12,12 @@ import httpx
 
 from webgrade.adapters.accessibility import run_pa11y
 from webgrade.collectors.base import CatalogCollector, CollectorMetadata, CollectorOutput
-from webgrade.adapters.freshness import _extract_footer_year, _extract_visible_dates, _parse_cdx_timestamps
+from webgrade.adapters.freshness import _extract_footer_year, _extract_visible_dates, _parse_cdx_timestamps, run_freshness
 from webgrade.adapters.pagespeed import _parse_categories
 from webgrade.adapters.screenshots import capture_screenshots
 from webgrade.adapters.security import grade_security_headers
 from webgrade.adapters.wappalyzer import inspect_technologies
+from webgrade.pipeline.orchestrator import _manual_review_reason_for_adapter
 from webgrade.scoring.engine import compute_scores
 from webgrade.types import CatalogSite
 
@@ -66,6 +67,46 @@ class AdapterParsingTests(unittest.TestCase):
         self.assertTrue(first.startswith("2024-01-01"))
         self.assertTrue(latest.startswith("2026-01-01"))
         self.assertGreater(yearly, 1.0)
+
+    def test_freshness_returns_partial_when_wayback_fails_but_page_fetch_succeeds(self) -> None:
+        class FakeResponse:
+            def __init__(self, *, json_payload: object | None = None, text: str = "") -> None:
+                self._json_payload = json_payload
+                self.text = text
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> object:
+                return self._json_payload
+
+        class FakeClient:
+            def get(self, url: str, params: dict[str, object] | None = None) -> FakeResponse:
+                if "web.archive.org" in url:
+                    raise httpx.ConnectError("wayback unavailable")
+                return FakeResponse(text="<footer>Copyright 2026 Example</footer><time>March 1, 2026</time>")
+
+            def close(self) -> None:
+                return None
+
+        result = run_freshness("https://example.com", client=FakeClient())
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["summary"]["page_fetch_status"], "ok")
+        self.assertEqual(result["summary"]["wayback_status"], "failed")
+        self.assertEqual(result["summary"]["footer_copyright_year"], 2026)
+        self.assertEqual(result["summary"]["visible_latest_content_at"], "2026-03-01")
+
+    def test_manual_review_reason_for_adapter_uses_partial_when_available(self) -> None:
+        reason = _manual_review_reason_for_adapter(
+            "freshness",
+            [
+                {
+                    "adapter_key": "freshness",
+                    "status": "partial",
+                }
+            ],
+        )
+        self.assertEqual(reason, "freshness_partial")
 
     def test_wappalyzer_heuristics_detect_wordpress_and_signals(self) -> None:
         html = """
