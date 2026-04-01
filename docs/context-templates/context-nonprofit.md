@@ -13,6 +13,11 @@ governing_framework:
 - Donor and volunteer engagement best practices
 - WCAG 2.1 AA
 
+## Report Audience
+- board members
+- executive director
+- senior leadership
+
 ## Primary Stakeholders
 - board members
 - staff and volunteers

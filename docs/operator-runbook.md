@@ -55,6 +55,7 @@ Important context-file rules:
 
 - old `Audience Family` context files are no longer supported
 - use the richer `Sector Classification` format from the starter templates
+- `Report Audience` is required and should name the people expected to receive the report, not the broader stakeholder set
 - the order of `Priority Impact Lenses` controls which reasons appear first in the report body
 
 ## Common Commands

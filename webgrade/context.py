@@ -9,6 +9,7 @@ from webgrade.types import ReportContext
 _REQUIRED_SECTIONS = {
     "Sector Classification",
     "Benchmarking References",
+    "Report Audience",
     "Primary Stakeholders",
     "Organizational Goals",
     "Priority Impact Lenses",
@@ -175,6 +176,7 @@ def parse_context_markdown(markdown_text: str) -> ReportContext:
         raise ValueError("Sector Classification must include governing_framework or governing_legislation as a non-empty list")
 
     audience_family = _sector_classification_to_family(classification)
+    report_audience = _validate_required_list("Report Audience", _parse_list(sections["Report Audience"]))
     stakeholders = _validate_required_list("Primary Stakeholders", _parse_list(sections["Primary Stakeholders"]))
     goals = _validate_required_list("Organizational Goals", _parse_list(sections["Organizational Goals"]))
     benchmarking_references = _validate_required_list("Benchmarking References", _parse_list(sections["Benchmarking References"]))
@@ -201,6 +203,7 @@ def parse_context_markdown(markdown_text: str) -> ReportContext:
         jurisdiction=jurisdiction,
         governing_framework=[str(item) for item in governing_framework],
         benchmarking_references=benchmarking_references,
+        report_audience=report_audience,
         stakeholders=stakeholders,
         organizational_goals=goals,
         priority_impact_lenses=impact_lenses,

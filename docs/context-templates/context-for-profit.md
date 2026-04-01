@@ -13,6 +13,11 @@ governing_framework:
 - Search and conversion best practices
 - WCAG 2.1 AA
 
+## Report Audience
+- owners
+- executives
+- non-technical decision-makers
+
 ## Primary Stakeholders
 - owners and leadership
 - marketing and sales staff

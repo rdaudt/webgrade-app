@@ -20,6 +20,10 @@ governing_framework:
 ## Benchmarking References
 - WCAG 2.1 AA
 
+## Report Audience
+- councillors
+- CAO
+
 ## Primary Stakeholders
 - council
 - residents
@@ -50,6 +54,7 @@ Test note
         self.assertEqual(context.sub_sector, "municipal_government")
         self.assertIn("resident_service", context.priority_impact_lenses)
         self.assertIn("WCAG 2.1 AA", context.benchmarking_references)
+        self.assertIn("councillors", context.report_audience)
         self.assertTrue(context.scope_notes)
         self.assertIn("constructively", context.desired_tone_rules[0].lower())
 
@@ -97,6 +102,9 @@ governing_framework:
 ## Benchmarking References
 - WCAG 2.1 AA
 
+## Report Audience
+- board chair
+
 ## Primary Stakeholders
 - board
 - donors
@@ -123,6 +131,7 @@ None
         )
         self.assertEqual(context.audience_family, "nonprofit")
         self.assertIn("custom_local_priority", context.priority_impact_lenses)
+        self.assertIn("board chair", context.report_audience)
 
 
 if __name__ == "__main__":
