@@ -544,6 +544,7 @@ class CliIntegrationTests(unittest.TestCase):
         api_key: str | None,
         model: str,
         delay_seconds: float = 0.0,
+        max_output_tokens: int = 2200,
     ) -> list[dict[str, object]]:
         results: list[dict[str, object]] = []
         for screenshot in screenshots:
@@ -578,7 +579,13 @@ class CliIntegrationTests(unittest.TestCase):
                             }
                         ],
                     },
-                    "raw": {"site_url": site_url, "model": model, "delay_seconds": delay_seconds, "api_key_present": api_key is not None},
+                    "raw": {
+                        "site_url": site_url,
+                        "model": model,
+                        "delay_seconds": delay_seconds,
+                        "max_output_tokens": max_output_tokens,
+                        "api_key_present": api_key is not None,
+                    },
                     "error": None,
                 }
             )

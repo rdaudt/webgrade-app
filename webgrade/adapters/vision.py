@@ -103,12 +103,13 @@ def _single_vision_result(
     api_key: str,
     model: str,
     client: OpenAI,
+    max_output_tokens: int,
 ) -> dict[str, Any]:
     response = client.responses.parse(
         model=model,
         reasoning={"effort": "high"},
         text_format=VisionAssessment,
-        max_output_tokens=2200,
+        max_output_tokens=max_output_tokens,
         store=False,
         input=[
             {
@@ -145,6 +146,7 @@ def run_vision_for_captures(
     api_key: str | None,
     model: str,
     delay_seconds: float = 0.0,
+    max_output_tokens: int = 2200,
 ) -> list[dict[str, Any]]:
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is required when vision scoring is enabled")
@@ -164,6 +166,7 @@ def run_vision_for_captures(
                     api_key=api_key,
                     model=model,
                     client=client,
+                    max_output_tokens=max_output_tokens,
                 )
                 results.append(result)
                 last_error = None

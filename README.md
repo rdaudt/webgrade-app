@@ -62,6 +62,7 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 - `PAGESPEED_API_KEY` is optional but recommended to improve quota headroom.
 - `OPENAI_VISION_MODEL` defaults to `gpt-5.4`.
 - `WEBGRADE_VISION_DELAY_SECONDS` adds a delay between screenshot-scoring calls if you need to slow the vision stage down.
+- `OPENAI_VISION_MAX_OUTPUT_TOKENS` defaults to `2200` and controls the Responses API structured-output budget for each screenshot.
 - `OPENAI_VISION_INPUT_COST_PER_1M_TOKENS` and `OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS` are optional. If set, WebGrade estimates vision cost in the batch review summary.
 - `--context` is required for report-generating runs and should usually point to one of the starter templates in [docs/context-templates](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates).
 - old `Audience Family` context files are no longer supported; use the richer `Sector Classification` format from the starter templates.
