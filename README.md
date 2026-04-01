@@ -46,7 +46,7 @@ The current implementation covers the main v1 pipeline:
 - technical audit adapters for PageSpeed, security/TLS, freshness, DOM heuristics, and Wappalyzer-style technology detection
 - Playwright screenshots and Pa11y accessibility checks
 - OpenAI vision scoring with structured output and `--only-vision` reuse support
-- required run-level `context.md` input with audience-family-aware report framing
+- required run-level `context.md` input with sector-based report framing
 - deterministic scoring, findings, HTML reports, PDF exports, Excel export, and JSON export
 
 Runs may still finish as `partial` when requested stages fail in the local environment, for example:
@@ -63,6 +63,8 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 - `OPENAI_VISION_MODEL` defaults to `gpt-5.4`.
 - `WEBGRADE_VISION_DELAY_SECONDS` adds a delay between screenshot-scoring calls if you need to slow the vision stage down.
 - `--context` is required for report-generating runs and should usually point to one of the starter templates in [docs/context-templates](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates).
+- old `Audience Family` context files are no longer supported; use the richer `Sector Classification` format from the starter templates.
+- the order of `Priority Impact Lenses` matters because it controls which reasons are surfaced first in the report body.
 
 For a fuller workflow, rerun behavior, and troubleshooting guide, see [docs/operator-runbook.md](C:/Users/Carboteiro/projects/webgrade-app/docs/operator-runbook.md).
 

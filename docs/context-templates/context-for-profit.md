@@ -1,17 +1,29 @@
 # Run Context
 
-## Audience Family
-for_profit
+## Sector Classification
+sector: private
+sub_sector: for_profit_business
+jurisdiction: British Columbia, Canada
+governing_framework:
+  - Consumer protection and privacy obligations relevant to the business
+  - Internal brand, sales, and customer service expectations
+
+## Benchmarking References
+- Industry competitor experience benchmarks
+- Search and conversion best practices
+- WCAG 2.1 AA
 
 ## Primary Stakeholders
-- owner or leadership team
+- owners and leadership
 - marketing and sales staff
-- customers and prospective customers
+- current customers
+- prospective customers
 
 ## Organizational Goals
-- improve lead generation
-- strengthen trust and conversion
+- improve lead generation and conversion
+- strengthen customer trust
 - reduce friction in common customer tasks
+- support discoverability through search
 
 ## Priority Impact Lenses
 - revenue
@@ -23,14 +35,18 @@ for_profit
 
 ## Primary Risks Or Sensitivities
 - limited marketing budget
-- conversion drop-off
-- credibility concerns from dated design
+- credibility loss from dated design
+- drop-off in key conversion paths
+- inconsistent messaging across service pages
 
 ## Scope Notes
 - This assessment covers the public website only in this run.
 
 ## Desired Tone
-Respectful, commercially aware, plain-language, independent
+- findings should be framed clearly for non-technical decision-makers
+- avoid exaggerated language or unsupported urgency claims
+- connect issues to trust, conversion, and customer friction where relevant
+- distinguish between quick wins and larger modernization work
 
 ## Operator Notes
 Add batch-specific notes here.

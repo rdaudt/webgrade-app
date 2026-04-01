@@ -30,22 +30,34 @@ class RunOptions:
 @dataclass(slots=True)
 class ReportContext:
     audience_family: str
+    sector: str
+    sub_sector: str
+    jurisdiction: str
+    governing_framework: list[str]
+    benchmarking_references: list[str]
     stakeholders: list[str]
     organizational_goals: list[str]
     priority_impact_lenses: list[str]
     risks_or_sensitivities: list[str]
     scope_notes: list[str]
-    desired_tone: str
+    desired_tone_rules: list[str]
     operator_notes: str | None = None
 
     def to_summary(self) -> dict[str, object]:
         return {
             "audience_family": self.audience_family,
+            "sector_classification": {
+                "sector": self.sector,
+                "sub_sector": self.sub_sector,
+                "jurisdiction": self.jurisdiction,
+                "governing_framework": self.governing_framework,
+            },
+            "benchmarking_references": self.benchmarking_references,
             "stakeholders": self.stakeholders,
             "organizational_goals": self.organizational_goals,
             "priority_impact_lenses": self.priority_impact_lenses,
             "risks_or_sensitivities": self.risks_or_sensitivities,
             "scope_notes": self.scope_notes,
-            "desired_tone": self.desired_tone,
+            "desired_tone_rules": self.desired_tone_rules,
             "operator_notes": self.operator_notes,
         }

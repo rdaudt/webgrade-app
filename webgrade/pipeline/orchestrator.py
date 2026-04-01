@@ -541,7 +541,7 @@ def _finalize_site_run(
 
     score_payload = compute_scores({key: result["summary"] for key, result in adapter_results.items()})
     _store_scores(db, run_id, score_payload)
-    findings = build_findings(score_payload, {key: result["summary"] for key, result in adapter_results.items()})
+    findings = build_findings(score_payload, {key: result["summary"] for key, result in adapter_results.items()}, report_context)
     _store_findings(db, run_id, findings)
 
     if score_payload["overall_opportunity_score"] is None:
