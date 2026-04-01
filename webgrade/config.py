@@ -19,6 +19,8 @@ class Settings:
     openai_api_key: str | None
     openai_vision_model: str
     vision_delay_seconds: float
+    openai_vision_input_cost_per_1m_tokens: float | None
+    openai_vision_output_cost_per_1m_tokens: float | None
     pagespeed_api_key: str | None
 
     def create_batch_dir(self) -> Path:
@@ -34,6 +36,13 @@ class Settings:
         return batch_dir
 
 
+def _optional_float_from_env(name: str) -> float | None:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return None
+    return float(raw)
+
+
 def load_settings(output_dir: Path | None) -> Settings:
     load_dotenv()
     output_root = (output_dir or DEFAULT_OUTPUT_DIR).resolve()
@@ -44,5 +53,7 @@ def load_settings(output_dir: Path | None) -> Settings:
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_vision_model=os.getenv("OPENAI_VISION_MODEL", "gpt-5.4"),
         vision_delay_seconds=float(os.getenv("WEBGRADE_VISION_DELAY_SECONDS", "0.0")),
+        openai_vision_input_cost_per_1m_tokens=_optional_float_from_env("OPENAI_VISION_INPUT_COST_PER_1M_TOKENS"),
+        openai_vision_output_cost_per_1m_tokens=_optional_float_from_env("OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS"),
         pagespeed_api_key=os.getenv("PAGESPEED_API_KEY"),
     )

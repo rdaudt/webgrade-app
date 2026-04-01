@@ -28,7 +28,13 @@ from webgrade.context import load_report_context
 from webgrade.db import Database
 from webgrade.exporters import export_catalog_excel, export_catalog_json
 from webgrade.logging_utils import close_logging, configure_logging, log_event
-from webgrade.reporting import build_findings, export_pdf_report, render_html_report
+from webgrade.reporting import (
+    build_batch_review_summary,
+    build_findings,
+    export_pdf_report,
+    render_batch_review_markdown,
+    render_html_report,
+)
 from webgrade.scoring import compute_scores
 from webgrade.types import CatalogSite, RunOptions
 from webgrade.utils import site_slug
@@ -38,6 +44,7 @@ from webgrade.utils import site_slug
 class BatchSummary:
     batch_id: int
     batch_dir: Path
+    review_summary_path: Path | None
     total_sites: int
     complete_sites: int
     partial_sites: int
@@ -614,6 +621,7 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
             context_raw_markdown=context_raw_markdown,
             context_summary=context_summary,
         )
+        review_summary_path: Path | None = None
         db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="context_file", relative_path="context.md")
 
         log_event(logger, logging.INFO, f"Created batch {batch_id} with {len(sites)} site(s)", batch_id=batch_id, stage="batch")
@@ -663,8 +671,15 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
             db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="log_file", relative_path="webgrade.log")
             excel_path = export_catalog_excel(db, batch_id, batch_dir)
             db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="excel_catalog", relative_path=excel_path.name)
+            review_summary = build_batch_review_summary(db, batch_id, settings)
+            review_summary_path = batch_dir / "batch-review.md"
+            review_summary_path.write_text(
+                render_batch_review_markdown(review_summary, context_summary),
+                encoding="utf-8",
+            )
+            db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="batch_review", relative_path=review_summary_path.name)
             db.add_artifact(batch_id=batch_id, run_id=None, artifact_type="json_bundle", relative_path="catalog.json")
-            export_catalog_json(db, batch_id, batch_dir)
+            export_catalog_json(db, batch_id, batch_dir, review_summary=review_summary)
             log_event(logger, logging.INFO, f"Finished batch {batch_id} with status {status}", batch_id=batch_id, stage="batch_complete")
         finally:
             close_logging(logger)
@@ -672,6 +687,7 @@ def run_batch(settings: Settings, options: RunOptions) -> BatchSummary:
     return BatchSummary(
         batch_id=batch_id,
         batch_dir=batch_dir,
+        review_summary_path=review_summary_path,
         total_sites=len(sites),
         complete_sites=counts["complete"],
         partial_sites=counts["partial"],

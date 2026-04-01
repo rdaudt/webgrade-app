@@ -203,6 +203,154 @@ class CliIntegrationTests(unittest.TestCase):
     @patch("webgrade.pipeline.orchestrator.run_vision_for_captures")
     @patch("webgrade.pipeline.orchestrator.capture_screenshots")
     @patch("webgrade.pipeline.orchestrator._run_technical_adapters")
+    def test_batch_run_writes_batch_review_summary(
+        self,
+        mock_run_technical_adapters: object,
+        mock_capture_screenshots: object,
+        mock_run_vision_for_captures: object,
+        mock_export_pdf_report: object,
+    ) -> None:
+        mock_run_technical_adapters.return_value = (
+            {
+                "pagespeed_desktop": {
+                    "adapter_key": "pagespeed_desktop",
+                    "viewport": "desktop",
+                    "status": "ok",
+                    "summary": {"performance": 72, "accessibility": 85, "best_practices": 90, "seo": 68},
+                    "raw": {},
+                    "error": None,
+                },
+                "pagespeed_mobile": {
+                    "adapter_key": "pagespeed_mobile",
+                    "viewport": "mobile",
+                    "status": "ok",
+                    "summary": {"performance": 54, "accessibility": 63, "best_practices": 75, "seo": 59},
+                    "raw": {},
+                    "error": None,
+                },
+                "security_headers": {
+                    "adapter_key": "security_headers",
+                    "viewport": "combined",
+                    "status": "ok",
+                    "summary": {"grade": "C", "headers_present": {}},
+                    "raw": {},
+                    "error": None,
+                },
+                "tls_certificate": {
+                    "adapter_key": "tls_certificate",
+                    "viewport": "combined",
+                    "status": "ok",
+                    "summary": {"status": "valid", "expires_at": None, "days_to_expiry": 90},
+                    "raw": {},
+                    "error": None,
+                },
+                "freshness": {
+                    "adapter_key": "freshness",
+                    "viewport": "combined",
+                    "status": "ok",
+                    "summary": {
+                        "reference_content_at": "2026-01-01T00:00:00+00:00",
+                        "estimated_changes_per_year": 3.0,
+                        "footer_copyright_year": 2026,
+                    },
+                    "raw": {},
+                    "error": None,
+                },
+                "dom_heuristics": {
+                    "adapter_key": "dom_heuristics",
+                    "viewport": "combined",
+                    "status": "ok",
+                    "summary": {
+                        "has_viewport_meta": True,
+                        "viewport_meta_value": "width=device-width, initial-scale=1",
+                        "has_search": False,
+                        "search_bbox": None,
+                        "has_contact_above_fold": True,
+                        "contact_bbox": None,
+                    },
+                    "raw": {},
+                    "error": None,
+                },
+                "wappalyzer": {
+                    "adapter_key": "wappalyzer",
+                    "viewport": "combined",
+                    "status": "ok",
+                    "summary": {
+                        "cms_name": "WordPress",
+                        "cms_version": "5.9.0",
+                        "platform_status": "supported_old",
+                        "frameworks": ["jQuery"],
+                        "hosting_provider": "Cloudflare",
+                        "analytics_tools": ["Google Analytics"],
+                        "has_accessibility_toolbar": False,
+                    },
+                    "raw": {},
+                    "error": None,
+                },
+                "pa11y": {
+                    "adapter_key": "pa11y",
+                    "viewport": "combined",
+                    "status": "ok",
+                    "summary": {
+                        "issue_count_total": 1,
+                        "count_a": 0,
+                        "count_aa": 1,
+                        "count_aaa": 0,
+                        "weighted_issue_count": 3,
+                    },
+                    "raw": {},
+                    "error": None,
+                },
+            },
+            [],
+        )
+        mock_capture_screenshots.side_effect = self._fake_capture_screenshots
+        mock_run_vision_for_captures.side_effect = self._fake_vision_results
+        mock_export_pdf_report.side_effect = self._fake_export_pdf_report
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            input_csv = temp_root / "catalog.csv"
+            context_path = self._write_context(temp_root)
+            input_csv.write_text("url,name\nhttps://example.com,Example\n", encoding="utf-8")
+            output_dir = temp_root / "output"
+
+            exit_code = main(
+                [
+                    "run",
+                    "--input",
+                    str(input_csv),
+                    "--context",
+                    str(context_path),
+                    "--output",
+                    str(output_dir),
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            batch_dirs = [path for path in output_dir.iterdir() if path.is_dir()]
+            self.assertEqual(len(batch_dirs), 1)
+            batch_dir = batch_dirs[0]
+
+            review_path = batch_dir / "batch-review.md"
+            self.assertTrue(review_path.exists())
+            review_text = review_path.read_text(encoding="utf-8")
+            self.assertIn("Batch Review Summary", review_text)
+            self.assertIn("Vision Usage", review_text)
+            self.assertIn("Successful vision calls", review_text)
+
+            payload = json.loads((batch_dir / "catalog.json").read_text(encoding="utf-8"))
+            review_summary = payload["batch"]["review_summary"]
+            self.assertEqual(review_summary["site_counts"]["total"], 1)
+            self.assertEqual(review_summary["vision_usage"]["successful_calls"], 2)
+            self.assertEqual(review_summary["vision_usage"]["input_tokens"], 600)
+            self.assertEqual(review_summary["vision_usage"]["output_tokens"], 160)
+            self.assertIsNone(review_summary["vision_usage"]["estimated_cost_usd"])
+
+    @patch("webgrade.pipeline.orchestrator.export_pdf_report")
+    @patch("webgrade.pipeline.orchestrator.run_vision_for_captures")
+    @patch("webgrade.pipeline.orchestrator.capture_screenshots")
+    @patch("webgrade.pipeline.orchestrator._run_technical_adapters")
     def test_only_vision_reuses_prior_evidence(
         self,
         mock_run_technical_adapters: object,
@@ -434,6 +582,11 @@ class CliIntegrationTests(unittest.TestCase):
                     "error": None,
                 }
             )
+            results[-1]["raw"]["usage"] = {
+                "input_tokens": 300,
+                "output_tokens": 80,
+                "total_tokens": 380,
+            }
         return results
 
     @staticmethod

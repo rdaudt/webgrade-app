@@ -71,6 +71,30 @@ def _instructions(viewport: str, site_url: str) -> str:
     )
 
 
+def _usage_payload(response: Any) -> dict[str, Any]:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return {}
+    if hasattr(usage, "model_dump"):
+        dumped = usage.model_dump(mode="json")
+        if isinstance(dumped, dict):
+            return dumped
+    payload: dict[str, Any] = {}
+    for key in ("input_tokens", "output_tokens", "total_tokens"):
+        value = getattr(usage, key, None)
+        if value is not None:
+            payload[key] = int(value)
+    for key in ("input_tokens_details", "output_tokens_details"):
+        value = getattr(usage, key, None)
+        if value is None:
+            continue
+        if hasattr(value, "model_dump"):
+            payload[key] = value.model_dump(mode="json")
+        elif isinstance(value, dict):
+            payload[key] = value
+    return payload
+
+
 def _single_vision_result(
     *,
     site_url: str,
@@ -108,6 +132,7 @@ def _single_vision_result(
             "response_id": response.id,
             "model": response.model,
             "output_text": getattr(response, "output_text", None),
+            "usage": _usage_payload(response),
         },
         "error": None,
     }

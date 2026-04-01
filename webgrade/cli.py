@@ -69,4 +69,6 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Sites partial: {summary.partial_sites}")
     print(f"Sites failed: {summary.failed_sites}")
     print(f"Output directory: {summary.batch_dir}")
+    if summary.review_summary_path is not None:
+        print(f"Batch review summary: {summary.review_summary_path}")
     return 0

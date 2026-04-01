@@ -29,6 +29,8 @@ Recommended variables:
 OPENAI_API_KEY=...
 OPENAI_VISION_MODEL=gpt-5.4
 WEBGRADE_VISION_DELAY_SECONDS=0.0
+OPENAI_VISION_INPUT_COST_PER_1M_TOKENS=
+OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS=
 PAGESPEED_API_KEY=...
 ```
 
@@ -95,6 +97,7 @@ webgrade-output/
   webgrade.sqlite3
   2026-03-31T17-00-00Z/
     webgrade.log
+    batch-review.md
     context.md
     catalog.xlsx
     catalog.json
@@ -137,6 +140,7 @@ Intentional skips do not force a run to `partial`. Requested-stage failures do.
 - Screenshot capture can still fail on some slow or restrictive sites even with one retry.
 - PDF generation requires Playwright browser binaries installed in the active venv environment.
 - Vision scoring requires valid screenshots and `OPENAI_API_KEY`.
+- Vision cost is only estimated when `OPENAI_VISION_INPUT_COST_PER_1M_TOKENS` and `OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS` are set.
 - Technology detection is heuristic and should be treated as best-effort.
 
 ## Troubleshooting
@@ -157,6 +161,7 @@ If vision is failing:
 - confirm `.env` contains `OPENAI_API_KEY`
 - verify screenshots exist in the prior batch when using `--only-vision`
 - increase `WEBGRADE_VISION_DELAY_SECONDS` if you suspect rate limiting
+- review `batch-review.md` for aggregated token usage and the most common failure patterns in the batch
 
 If PageSpeed is throttled:
 
@@ -170,6 +175,7 @@ Before broader rollout:
 
 1. Run 3-5 representative municipal sites.
 2. Inspect `catalog.json`, `catalog.xlsx`, and each HTML report.
-3. Check `webgrade.log` for stage failures and retry patterns.
-4. Review score plausibility and top findings for calibration.
-5. Record any sites that need screenshot timeout tuning or heuristic fixes.
+3. Read `batch-review.md` for common issues, top findings, and aggregated vision usage.
+4. Check `webgrade.log` for stage failures and retry patterns.
+5. Review score plausibility and top findings for calibration.
+6. Record any sites that need screenshot timeout tuning or heuristic fixes.

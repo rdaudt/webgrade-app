@@ -18,7 +18,12 @@ COMPOSITE_DIMENSIONS = {
 }
 
 
-def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
+def export_catalog_json(
+    db: Database,
+    batch_id: int,
+    batch_dir: Path,
+    review_summary: dict[str, object] | None = None,
+) -> Path:
     batch = db.get_batch(batch_id)
     runs = db.list_batch_runs(batch_id)
     artifacts = db.list_batch_artifacts(batch_id)
@@ -140,6 +145,7 @@ def export_catalog_json(db: Database, batch_id: int, batch_dir: Path) -> Path:
                 "site_count_partial": batch["site_count_partial"],
                 "site_count_failed": batch["site_count_failed"],
             },
+            "review_summary": review_summary or {},
         },
         "artifacts": [
             {
