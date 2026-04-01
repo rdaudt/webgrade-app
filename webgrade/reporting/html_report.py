@@ -73,27 +73,32 @@ _AUDIENCE_LABELS = {
 
 _TAG_REASON_TEXT = {
     "municipal": {
-        "resident_service": ("residents", "People may have to work harder than they should to get routine information or services."),
-        "legal": ("the municipality", "This can become harder and more expensive to address later if standards tighten or complaints arise."),
+        "resident_service": ("Resident service", "People may have to work harder than they should to get routine information or services."),
+        "accessibility": ("Accessible access", "Barriers in the website experience can exclude people who should be able to use public information and services with confidence."),
+        "civic_engagement": ("Civic engagement", "If information is harder to find or trust, public participation and understanding can suffer."),
+        "legal_compliance": ("Legal and compliance", "This can become harder and more expensive to address later if standards tighten or complaints arise."),
+        "indigenous_relations": ("Indigenous relations", "Digital communications affect how respectfully and reliably the municipality engages with Indigenous Nations and communities."),
+        "emergency_communications": ("Emergency communications", "Important alerts and practical information need to stay easy to access when urgency is high."),
         "operational": ("the municipality", "When the site does not answer simple needs clearly, more of that demand shifts back onto staff time."),
         "reputation": ("the municipality", "A weak digital experience can make the organization feel less responsive or less current than it is."),
         "economic_development": ("the municipality", "First impressions online can influence how residents, visitors, and businesses perceive the community."),
     },
     "for_profit": {
-        "revenue": ("customers", "Extra friction can cause potential customers to leave before taking the next step."),
-        "conversion": ("the business", "The site may be doing less than it could to turn attention into enquiries or sales."),
-        "customer_trust": ("the business", "Trust signals matter early, especially when a visitor is deciding whether to engage."),
-        "lead_generation": ("the business", "A weaker experience can reduce the number of people who contact the business or request service."),
-        "search_visibility": ("the business", "If the site is harder to find or use, it can become a weaker channel for new demand."),
-        "operational_efficiency": ("the business", "A clearer site can reduce avoidable back-and-forth and support a smoother customer journey."),
+        "revenue": ("Revenue", "Extra friction can cause potential customers to leave before taking the next step."),
+        "conversion": ("Conversion", "The site may be doing less than it could to turn attention into enquiries or sales."),
+        "customer_trust": ("Customer trust", "Trust signals matter early, especially when a visitor is deciding whether to engage."),
+        "lead_generation": ("Lead generation", "A weaker experience can reduce the number of people who contact the business or request service."),
+        "search_visibility": ("Search visibility", "If the site is harder to find or use, it can become a weaker channel for new demand."),
+        "operational_efficiency": ("Operational efficiency", "A clearer site can reduce avoidable back-and-forth and support a smoother customer journey."),
     },
     "nonprofit": {
-        "service_delivery": ("community members", "People looking for support or program information may have a harder time getting what they need."),
-        "accessibility_inclusion": ("community members", "If the site creates barriers, it can unintentionally exclude people the organization is trying to serve."),
-        "donor_trust": ("the organization", "The website often shapes whether donors and funders feel confidence in the organization."),
-        "volunteer_engagement": ("the organization", "A clearer experience can make it easier for volunteers and supporters to stay engaged."),
-        "grant_readiness": ("the organization", "A dated or inaccessible site can weaken readiness for funders who expect clear public information."),
-        "reputation": ("the organization", "Digital experience contributes to public trust and confidence in the mission."),
+        "service_delivery": ("Service delivery", "People looking for support or program information may have a harder time getting what they need."),
+        "accessibility_inclusion": ("Accessibility and inclusion", "If the site creates barriers, it can unintentionally exclude people the organization is trying to serve."),
+        "donor_trust": ("Donor and funder trust", "The website often shapes whether donors and funders feel confidence in the organization."),
+        "volunteer_engagement": ("Volunteer engagement", "A clearer experience can make it easier for volunteers and supporters to stay engaged."),
+        "grant_readiness": ("Grant readiness", "A dated or inaccessible site can weaken readiness for funders who expect clear public information."),
+        "reputation": ("Reputation", "Digital experience contributes to public trust and confidence in the mission."),
+        "operational_efficiency": ("Operational efficiency", "A clearer site can reduce avoidable friction for staff, volunteers, and supporters."),
     },
 }
 
@@ -101,6 +106,10 @@ _TAG_REASON_TEXT = {
 def _audience_labels(report_context: dict[str, Any]) -> dict[str, str]:
     family = str(report_context.get("audience_family") or "municipal")
     return _AUDIENCE_LABELS.get(family, _AUDIENCE_LABELS["municipal"])
+
+
+def _tone_rules(report_context: dict[str, Any]) -> list[str]:
+    return [str(item) for item in report_context.get("desired_tone_rules", []) if str(item).strip()]
 
 
 def _manual_review_note(manual_review_reasons: list[str]) -> str:
@@ -129,6 +138,7 @@ def _summary_paragraphs(
     report_context: dict[str, Any],
 ) -> str:
     labels = _audience_labels(report_context)
+    tone_rules = _tone_rules(report_context)
     opening = {
         "Tier 1": f"This website shows substantial room to better serve {labels['people']} through a more current and usable digital presence.",
         "Tier 2": f"This website is doing some of its job well, but there are meaningful opportunities to improve how it serves {labels['people']}.",
@@ -163,6 +173,10 @@ def _summary_paragraphs(
     if goals_sentence:
         parts.append(goals_sentence)
     parts.append(coverage_sentence)
+    if any("avoid language that implies negligence" in rule for rule in tone_rules):
+        parts.append("These findings are presented as improvement opportunities, not as evidence of neglect or lack of effort.")
+    if any("flag legal risks clearly but without alarm" in rule for rule in tone_rules):
+        parts.append("Where legal or standards-related issues appear relevant, they should be read as cautious risk signals rather than formal determinations.")
     return "".join(f"<p>{part}</p>" for part in parts)
 
 
@@ -214,19 +228,27 @@ def _strengths(score_payload: dict[str, Any], adapter_summaries: dict[str, dict[
     return strengths[:3]
 
 
-def _reason_line(finding: dict[str, Any], report_context: dict[str, Any]) -> tuple[str, str]:
+def _reason_line(finding: dict[str, Any], report_context: dict[str, Any], tag: str) -> tuple[str, str]:
     family = str(report_context.get("audience_family") or "municipal")
     reason_map = _TAG_REASON_TEXT.get(family, _TAG_REASON_TEXT["municipal"])
-    for tag in finding.get("framing_tags", []):
-        if tag in reason_map:
-            subject, text = reason_map[tag]
-            return subject, text
+    if tag in reason_map:
+        subject, text = reason_map[tag]
+        return subject, text
     labels = _audience_labels(report_context)
     return labels["organization"], "This issue creates avoidable friction that can make the digital experience less effective than it should be."
 
 
+def _top_reason_tags(finding: dict[str, Any], report_context: dict[str, Any]) -> list[str]:
+    preferred_order = [str(item) for item in report_context.get("priority_impact_lenses", [])]
+    finding_tags = [str(tag) for tag in finding.get("framing_tags", [])]
+    ordered = [tag for tag in preferred_order if tag in finding_tags]
+    extras = [tag for tag in finding_tags if tag not in ordered]
+    return (ordered + extras)[:2]
+
+
 def _recommendation_items(findings: list[dict[str, Any]], report_context: dict[str, Any]) -> list[dict[str, str]]:
     family = str(report_context.get("audience_family") or "municipal")
+    tone_rules = _tone_rules(report_context)
     recommendations: list[dict[str, str]] = []
     action_map = {
         "slow_mobile_experience": ("Improve the mobile experience first", "Start with the pages and tasks most likely to be used on a phone."),
@@ -254,7 +276,10 @@ def _recommendation_items(findings: list[dict[str, Any]], report_context: dict[s
             finding["finding_key"],
             ("Address the most visible digital friction", "Focus first on the issues that most directly affect trust and ease of use."),
         )
-        recommendations.append({"title": title, "detail": f"{detail} {organization_reason}"})
+        urgency = ""
+        if any("distinguish between findings that require immediate action" in rule for rule in tone_rules) and finding["severity"] == "high":
+            urgency = " This is one of the more immediate areas to address."
+        recommendations.append({"title": title, "detail": f"{detail} {organization_reason}{urgency}"})
     if not recommendations:
         recommendations.append(
             {
@@ -289,20 +314,18 @@ def _render_findings(findings: list[dict[str, Any]], report_context: dict[str, A
     if not findings:
         return "<p>No findings were generated for this run.</p>"
     cards: list[str] = []
-    labels = _audience_labels(report_context)
     for finding in findings:
-        subject, reason_line = _reason_line(finding, report_context)
-        organization_line = reason_line if subject == labels["organization"] else _reason_line(
-            {**finding, "framing_tags": [tag for tag in finding.get("framing_tags", []) if tag != finding.get("framing_tags", [None])[0]]},
-            report_context,
-        )[1]
+        reason_items = []
+        for tag in _top_reason_tags(finding, report_context):
+            label, text = _reason_line(finding, report_context, tag)
+            reason_items.append(f"<li><strong>{escape(label)}:</strong> {escape(text)}</li>")
         cards.append(
             f"""
             <article class="finding finding-{escape(finding['severity'])}">
               <h3>{escape(_FINDING_TITLES.get(finding['finding_key'], finding['finding_key'].replace('_', ' ').title()))}</h3>
               <p>{escape(finding['plain_text'])}</p>
-              <p><strong>Why this matters to {escape(labels['people'])}:</strong> {escape(reason_line if subject == labels['people'] else 'This issue can make common tasks or information harder to access than they should be.')}</p>
-              <p><strong>Why this matters to {escape(labels['organization'])}:</strong> {escape(organization_line)}</p>
+              <p><strong>Why this matters:</strong></p>
+              <ul class="finding-reasons">{''.join(reason_items)}</ul>
               <p><strong>Effort to address:</strong> {escape(finding['effort'].replace('_', ' ').title())}</p>
             </article>
             """
@@ -310,9 +333,36 @@ def _render_findings(findings: list[dict[str, Any]], report_context: dict[str, A
     return "".join(cards)
 
 
+def _render_methodology(report_context: dict[str, Any]) -> str:
+    classification = report_context.get("sector_classification", {})
+    benchmarking_refs = [str(item) for item in report_context.get("benchmarking_references", [])]
+    governing_framework = [str(item) for item in classification.get("governing_framework", [])]
+    sector = str(classification.get("sector") or "").replace("_", " ").title()
+    sub_sector = str(classification.get("sub_sector") or "").replace("_", " ").title()
+    jurisdiction = str(classification.get("jurisdiction") or "")
+    refs_html = "".join(f"<li>{escape(item)}</li>" for item in benchmarking_refs) or "<li>No benchmarking references were recorded for this run.</li>"
+    framework_html = "".join(f"<li>{escape(item)}</li>" for item in governing_framework) or "<li>No governing framework entries were recorded for this run.</li>"
+    return f"""
+    <section class="appendix-block">
+      <h3>Assessment Framework</h3>
+      <p>This assessment was framed using the declared sector context for this run. The references below informed interpretation and reporting tone, but they do not convert this report into a formal legal or compliance determination.</p>
+      <p><strong>Sector classification:</strong> {escape(sector)} / {escape(sub_sector)} / {escape(jurisdiction)}</p>
+      <p><strong>Benchmarking references</strong></p>
+      <ul>{refs_html}</ul>
+      <p><strong>Governing framework</strong></p>
+      <ul>{framework_html}</ul>
+    </section>
+    """
+
+
 def _render_appendix(technical_appendix: dict[str, Any]) -> str:
     sections: list[str] = []
+    report_context = technical_appendix.get("report_context", {})
+    if report_context:
+        sections.append(_render_methodology(report_context))
     for title, payload in technical_appendix.items():
+        if title == "report_context":
+            continue
         sections.append(
             f"""
             <section class="appendix-block">
@@ -412,6 +462,7 @@ def render_html_report(
     .screenshot-note {{ margin-top: 8px; color: #475569; }}
     .appendix-block {{ margin-bottom: 24px; break-inside: avoid; }}
     .appendix-block pre {{ white-space: pre-wrap; background: #f8fafc; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; }}
+    .finding-reasons {{ margin: 8px 0 12px 18px; }}
     ol li {{ margin-bottom: 12px; }}
     @media print {{ body {{ margin: 16px; }} .finding, .subscore-card, .card {{ break-inside: avoid; }} }}
   </style>
@@ -422,7 +473,7 @@ def render_html_report(
     <h1>{escape(site.get('name') or site['url'])}</h1>
     <p><strong>Website reviewed:</strong> {escape(site['url'])}</p>
     <p><strong>Date assessed:</strong> {escape(run['finished_at'] or run['started_at'])}</p>
-    <p><strong>Audience family:</strong> {escape(str(report_context.get('audience_family', '')).replace('_', ' ').title())}</p>
+    <p><strong>Sector classification:</strong> {escape(str(report_context.get('sector_classification', {}).get('sector', '')).replace('_', ' ').title())} / {escape(str(report_context.get('sector_classification', {}).get('sub_sector', '')).replace('_', ' ').title())}</p>
     <p class="header-note">{escape(scope_note[0])}</p>
   </section>
 

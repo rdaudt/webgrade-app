@@ -162,6 +162,9 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertEqual(len(payload["sites"]), 2)
             self.assertEqual(payload["batch"]["context"]["audience_family"], "municipal")
             self.assertEqual(payload["sites"][0]["run"]["context"]["audience_family"], "municipal")
+            self.assertEqual(payload["batch"]["context"]["sector_classification"]["sub_sector"], "municipal_government")
+            self.assertTrue(payload["batch"]["context"]["benchmarking_references"])
+            self.assertTrue(payload["batch"]["context"]["desired_tone_rules"])
             self.assertEqual(
                 payload["sites"][0]["scores"]["overall_opportunity_score"],
                 payload["sites"][1]["scores"]["overall_opportunity_score"],
@@ -176,6 +179,8 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertIn("Digital Presence Readiness", report_html)
             self.assertIn("What the site is doing well", report_html)
             self.assertIn("This assessment covers the municipal website only in this run.", report_html)
+            self.assertIn("Assessment Framework", report_html)
+            self.assertIn("Emergency communications", report_html)
             self.assertTrue((batch_dir / "context.md").exists())
 
     def test_report_name_requires_site(self) -> None:
@@ -437,8 +442,17 @@ class CliIntegrationTests(unittest.TestCase):
         context_path.write_text(
             """# Run Context
 
-## Audience Family
-municipal
+## Sector Classification
+sector: public
+sub_sector: municipal_government
+jurisdiction: British Columbia, Canada
+governing_framework:
+  - Community Charter (BC)
+  - Local Government Act (BC)
+
+## Benchmarking References
+- UBCM best practices
+- WCAG 2.1 AA
 
 ## Primary Stakeholders
 - municipal councillors
@@ -448,8 +462,26 @@ municipal
 - improve access to public information
 - reduce avoidable staff calls
 
+## Priority Impact Lenses
+- resident_service
+- emergency_communications
+- operational
+- reputation
+
+## Primary Risks Or Sensitivities
+- accessibility compliance gaps
+- limited staff capacity
+
 ## Scope Notes
 - This assessment covers the municipal website only in this run.
+
+## Desired Tone
+- findings should be framed constructively for non-technical audiences
+- avoid language that implies negligence; municipalities operate under significant resource constraints
+- flag legal risks clearly but without alarm
+
+## Operator Notes
+Pilot municipal run
 """,
             encoding="utf-8",
         )

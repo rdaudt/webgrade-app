@@ -48,6 +48,12 @@ Pick the context template that matches the audience family for the batch:
 
 Copy the appropriate template and edit it for the run before launching the batch.
 
+Important context-file rules:
+
+- old `Audience Family` context files are no longer supported
+- use the richer `Sector Classification` format from the starter templates
+- the order of `Priority Impact Lenses` controls which reasons appear first in the report body
+
 ## Common Commands
 
 Full batch:
