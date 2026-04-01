@@ -15,6 +15,11 @@ governing_framework:
 - Province of BC web standards
 - WCAG 2.1 AA
 
+## Report Audience
+- councillors
+- CAO
+- elected officials
+
 ## Primary Stakeholders
 - residents (general public)
 - elected officials (mayor and council)

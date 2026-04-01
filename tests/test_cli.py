@@ -164,6 +164,7 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertEqual(payload["sites"][0]["run"]["context"]["audience_family"], "municipal")
             self.assertEqual(payload["batch"]["context"]["sector_classification"]["sub_sector"], "municipal_government")
             self.assertTrue(payload["batch"]["context"]["benchmarking_references"])
+            self.assertTrue(payload["batch"]["context"]["report_audience"])
             self.assertTrue(payload["batch"]["context"]["desired_tone_rules"])
             self.assertEqual(
                 payload["sites"][0]["scores"]["overall_opportunity_score"],
@@ -176,11 +177,13 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertTrue(payload["sites"][0]["reports"]["pdf"])
             self.assertEqual(payload["sites"][0]["run"]["status"], "complete")
             report_html = (batch_dir / payload["sites"][0]["reports"]["html"]).read_text(encoding="utf-8")
+            header_html = report_html.split("</section>", 1)[0]
             self.assertIn("Digital Presence Readiness", report_html)
             self.assertIn("What the site is doing well", report_html)
-            self.assertIn("This assessment covers the municipal website only in this run.", report_html)
             self.assertIn("Assessment Framework", report_html)
             self.assertIn("Emergency communications", report_html)
+            self.assertNotIn("Sector classification:", header_html)
+            self.assertNotIn("This assessment covers the municipal website only in this run.", header_html)
             self.assertTrue((batch_dir / "context.md").exists())
 
     def test_report_name_requires_site(self) -> None:
@@ -613,6 +616,11 @@ governing_framework:
 ## Benchmarking References
 - UBCM best practices
 - WCAG 2.1 AA
+
+## Report Audience
+- councillors
+- CAO
+- elected officials
 
 ## Primary Stakeholders
 - municipal councillors

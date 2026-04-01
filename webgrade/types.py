@@ -35,6 +35,7 @@ class ReportContext:
     jurisdiction: str
     governing_framework: list[str]
     benchmarking_references: list[str]
+    report_audience: list[str]
     stakeholders: list[str]
     organizational_goals: list[str]
     priority_impact_lenses: list[str]
@@ -53,6 +54,7 @@ class ReportContext:
                 "governing_framework": self.governing_framework,
             },
             "benchmarking_references": self.benchmarking_references,
+            "report_audience": self.report_audience,
             "stakeholders": self.stakeholders,
             "organizational_goals": self.organizational_goals,
             "priority_impact_lenses": self.priority_impact_lenses,

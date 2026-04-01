@@ -159,20 +159,11 @@ def _summary_paragraphs(
     if goals:
         goals_sentence = f"This review is framed around the stated goals of {escape(', '.join(str(goal) for goal in goals[:2]))}."
 
-    coverage = float(run.get("score_coverage") or 0.0)
-    if coverage >= 0.99:
-        coverage_sentence = "The readiness score is based on a near-complete evidence set."
-    elif coverage > 0:
-        coverage_sentence = "The readiness score uses partial evidence because some inputs were unavailable in this run."
-    else:
-        coverage_sentence = "The readiness score uses minimal evidence and should be treated as provisional."
-
     parts = [opening]
     if findings_sentence:
         parts.append(findings_sentence)
     if goals_sentence:
         parts.append(goals_sentence)
-    parts.append(coverage_sentence)
     if any("avoid language that implies negligence" in rule for rule in tone_rules):
         parts.append("These findings are presented as improvement opportunities, not as evidence of neglect or lack of effort.")
     if any("flag legal risks clearly but without alarm" in rule for rule in tone_rules):
@@ -213,19 +204,61 @@ def _strengths(score_payload: dict[str, Any], adapter_summaries: dict[str, dict[
     labels = _audience_labels(report_context)
     dimensions = score_payload.get("dimensions", {})
     strengths: list[str] = []
-    if (dimensions.get("content_freshness", {}).get("opportunity_score") or 100) <= 35:
+
+    def _opportunity(key: str, default: float = 100.0) -> float:
+        value = dimensions.get(key, {}).get("opportunity_score")
+        if value is None:
+            return default
+        return float(value)
+
+    desktop_snapshot = float(score_payload.get("desktop_quality_snapshot") or 0.0)
+    mobile_snapshot = float(score_payload.get("mobile_quality_snapshot") or 0.0)
+    overall_opportunity = score_payload.get("overall_opportunity_score")
+    readiness_10 = None if overall_opportunity is None else ((100.0 - float(overall_opportunity)) / 10.0)
+
+    if desktop_snapshot >= 80:
+        strengths.append("The desktop experience is comparatively strong, with an interface that already feels usable and credible for everyday visitors.")
+    if mobile_snapshot >= 75:
+        strengths.append(f"The mobile experience is stronger than many public-sector sites, which helps {labels['people']} reach information more easily on a phone.")
+    if _opportunity("performance") <= 25:
+        strengths.append("Page speed signals are relatively healthy, which supports a smoother first impression and less friction during common tasks.")
+    if _opportunity("accessibility") <= 30:
+        strengths.append("Accessibility signals are stronger than average, suggesting fewer avoidable barriers for people who need clearer or more assistive access paths.")
+    if _opportunity("seo_fundamentals") <= 35:
+        strengths.append(f"The site appears reasonably easy to find online, which supports discovery by {labels['people']} and other outside visitors.")
+    if _opportunity("content_freshness") <= 35:
         strengths.append(f"Key public information appears reasonably current, which supports confidence for {labels['people']}.")
-    if (dimensions.get("security_posture", {}).get("opportunity_score") or 100) <= 35:
+    if _opportunity("security_posture") <= 35:
         strengths.append("Baseline trust and protection signals appear to be in place.")
     if adapter_summaries.get("dom_heuristics", {}).get("has_search") is True:
         strengths.append("A visible search pattern is present, which can support quicker self-service for common questions.")
     if adapter_summaries.get("dom_heuristics", {}).get("has_contact_above_fold") is True:
         strengths.append("Contact details appear prominently enough to support simple access needs.")
-    if (dimensions.get("visual_design_era", {}).get("opportunity_score") or 100) <= 45:
+    if _opportunity("technology_stack_modernity") <= 40:
+        strengths.append("The underlying site platform appears current enough to support improvement work without starting from a crisis position.")
+    if _opportunity("visual_design_era") <= 45:
         strengths.append(f"The site presents a more current first impression than many organizations at a similar scale.")
-    if len(strengths) < 3:
+
+    target_count = 3
+    if (readiness_10 or 0.0) >= 7.5 or desktop_snapshot >= 80 or mobile_snapshot >= 75:
+        target_count = 5
+    elif (readiness_10 or 0.0) >= 6.5:
+        target_count = 4
+
+    if len(strengths) < target_count:
+        strengths.append(f"The website already has enough working pieces in place for {labels['organization']} to improve from a position of stability rather than urgency.")
+    if len(strengths) < target_count and adapter_summaries.get("wappalyzer", {}).get("platform_status") in {"supported_current", "supported_old"}:
+        strengths.append("The site does not appear trapped on a clearly end-of-life platform, which gives the organization more room to improve in a planned way.")
+    if len(strengths) < target_count and adapter_summaries.get("dom_heuristics", {}).get("has_viewport_meta") is True:
+        strengths.append("Basic mobile-friendly setup signals are in place, which is a useful foundation for further usability improvements.")
+    if len(strengths) < target_count:
         strengths.append(f"The website provides a workable starting point for {labels['organization']} to improve from without needing to reframe the entire digital conversation.")
-    return strengths[:3]
+
+    deduped: list[str] = []
+    for item in strengths:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped[:target_count]
 
 
 def _reason_line(finding: dict[str, Any], report_context: dict[str, Any], tag: str) -> tuple[str, str]:
@@ -417,7 +450,6 @@ def render_html_report(
         f"<li><strong>{escape(item['title'])}</strong><br />{escape(item['detail'])}</li>"
         for item in recommendations
     )
-    scope_note = report_context.get("scope_notes") or ["This assessment covers the website only in this run."]
     top_cards = [
         ("Digital Presence Readiness", _opportunity_to_readiness_10(score_payload.get("overall_opportunity_score"))),
         ("Desktop experience snapshot", _quality_to_readiness_10(score_payload.get("desktop_quality_snapshot"))),
@@ -473,8 +505,6 @@ def render_html_report(
     <h1>{escape(site.get('name') or site['url'])}</h1>
     <p><strong>Website reviewed:</strong> {escape(site['url'])}</p>
     <p><strong>Date assessed:</strong> {escape(run['finished_at'] or run['started_at'])}</p>
-    <p><strong>Sector classification:</strong> {escape(str(report_context.get('sector_classification', {}).get('sector', '')).replace('_', ' ').title())} / {escape(str(report_context.get('sector_classification', {}).get('sub_sector', '')).replace('_', ' ').title())}</p>
-    <p class="header-note">{escape(scope_note[0])}</p>
   </section>
 
   <section>

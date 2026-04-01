@@ -66,6 +66,7 @@ Runs may still finish as `partial` when requested stages fail in the local envir
 - `OPENAI_VISION_INPUT_COST_PER_1M_TOKENS` and `OPENAI_VISION_OUTPUT_COST_PER_1M_TOKENS` are optional. If set, WebGrade estimates vision cost in the batch review summary.
 - `--context` is required for report-generating runs and should usually point to one of the starter templates in [docs/context-templates](C:/Users/Carboteiro/projects/webgrade-app/docs/context-templates).
 - old `Audience Family` context files are no longer supported; use the richer `Sector Classification` format from the starter templates.
+- `Report Audience` in `context.md` is required and is distinct from `Primary Stakeholders`; it should name the people expected to receive the report.
 - the order of `Priority Impact Lenses` matters because it controls which reasons are surfaced first in the report body.
 - each batch now writes a `batch-review.md` artifact with site outcomes, common issues, and aggregated vision token usage for pilot review.
 
