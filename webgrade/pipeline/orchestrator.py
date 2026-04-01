@@ -140,6 +140,17 @@ def _persist_adapter_results(db: Database, run_id: int, adapter_results: list[di
         )
 
 
+def _manual_review_reason_for_adapter(adapter_name: str, results: list[dict[str, Any]]) -> str | None:
+    statuses = {str(result.get("status") or "") for result in results}
+    if not statuses or statuses == {"ok"}:
+        return None
+    if "failed" in statuses:
+        return f"{adapter_name}_failed"
+    if "partial" in statuses:
+        return f"{adapter_name}_partial"
+    return f"{adapter_name}_review"
+
+
 def _run_technical_adapters(settings: Settings, site: CatalogSite, logger: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
     adapter_results: dict[str, dict[str, Any]] = {}
     manual_review_reasons: list[str] = []
@@ -165,7 +176,9 @@ def _run_technical_adapters(settings: Settings, site: CatalogSite, logger: Any) 
                 adapter_results[result["adapter_key"]] = result
             non_ok = [result["adapter_key"] for result in results if result["status"] != "ok"]
             if non_ok:
-                manual_review_reasons.append(f"{adapter_name}_failed")
+                reason = _manual_review_reason_for_adapter(adapter_name, results)
+                if reason is not None:
+                    manual_review_reasons.append(reason)
                 log_event(
                     logger,
                     logging.WARNING,
