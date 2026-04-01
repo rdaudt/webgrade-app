@@ -180,10 +180,9 @@ class CliIntegrationTests(unittest.TestCase):
             header_html = report_html.split("</section>", 1)[0]
             self.assertIn("Digital Presence Readiness", report_html)
             self.assertIn("What the site is doing well", report_html)
-            self.assertIn("Assessment Framework", report_html)
             self.assertIn("Emergency communications", report_html)
-            self.assertIn("dimensions.mobile_usability.opportunity_score", report_html)
-            self.assertNotIn("&#x27;overall_opportunity_score&#x27;", report_html)
+            self.assertNotIn("Technical Appendix", report_html)
+            self.assertNotIn("Assessment Framework", report_html)
             self.assertNotIn("Sector classification:", header_html)
             self.assertNotIn("This assessment covers the municipal website only in this run.", header_html)
             self.assertTrue((batch_dir / "context.md").exists())

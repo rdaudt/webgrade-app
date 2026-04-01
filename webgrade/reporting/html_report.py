@@ -601,11 +601,6 @@ def render_html_report(
       {recommendation_html}
     </ol>
   </section>
-
-  <section>
-    <h2>Technical Appendix</h2>
-    {_render_appendix(technical_appendix)}
-  </section>
 </body>
 </html>
 """
