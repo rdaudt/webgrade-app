@@ -388,6 +388,53 @@ def _render_methodology(report_context: dict[str, Any]) -> str:
     """
 
 
+def _scalar_text(value: Any) -> str:
+    if value is None:
+        return "None"
+    if isinstance(value, bool):
+        return "True" if value else "False"
+    return str(value)
+
+
+def _flatten_appendix_payload(value: Any, prefix: str = "") -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_prefix = f"{prefix}.{key}" if prefix else str(key)
+            rows.extend(_flatten_appendix_payload(child, child_prefix))
+        return rows
+    if isinstance(value, list):
+        if not value:
+            return [(prefix or "value", "[]")]
+        for index, child in enumerate(value):
+            child_prefix = f"{prefix}.{index}" if prefix else str(index)
+            rows.extend(_flatten_appendix_payload(child, child_prefix))
+        return rows
+    return [(prefix or "value", _scalar_text(value))]
+
+
+def _render_appendix_rows(payload: Any) -> str:
+    rows = _flatten_appendix_payload(payload)
+    if not rows:
+        return "<p>No appendix details are available for this section.</p>"
+    row_html = "".join(
+        f"""
+        <tr>
+          <th>{escape(key)}</th>
+          <td>{escape(value)}</td>
+        </tr>
+        """
+        for key, value in rows
+    )
+    return f"""
+    <table class="appendix-table">
+      <tbody>
+        {row_html}
+      </tbody>
+    </table>
+    """
+
+
 def _render_appendix(technical_appendix: dict[str, Any]) -> str:
     sections: list[str] = []
     report_context = technical_appendix.get("report_context", {})
@@ -400,7 +447,7 @@ def _render_appendix(technical_appendix: dict[str, Any]) -> str:
             f"""
             <section class="appendix-block">
               <h3>{escape(title.replace('_', ' ').title())}</h3>
-              <pre>{escape(str(payload))}</pre>
+              {_render_appendix_rows(payload)}
             </section>
             """
         )
@@ -493,7 +540,10 @@ def render_html_report(
     .annotation-captions {{ margin-top: 12px; padding-left: 20px; }}
     .screenshot-note {{ margin-top: 8px; color: #475569; }}
     .appendix-block {{ margin-bottom: 24px; break-inside: avoid; }}
-    .appendix-block pre {{ white-space: pre-wrap; background: #f8fafc; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; }}
+    .appendix-table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+    .appendix-table th, .appendix-table td {{ border: 1px solid #d1d5db; padding: 8px 10px; vertical-align: top; text-align: left; }}
+    .appendix-table th {{ width: 36%; background: #f8fafc; color: #0f172a; font-weight: 600; }}
+    .appendix-table td {{ background: #ffffff; color: #334155; }}
     .finding-reasons {{ margin: 8px 0 12px 18px; }}
     ol li {{ margin-bottom: 12px; }}
     @media print {{ body {{ margin: 16px; }} .finding, .subscore-card, .card {{ break-inside: avoid; }} }}
